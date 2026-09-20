@@ -14,7 +14,7 @@ Template educacional para o desenvolvimento de um projeto acadêmico de Machine 
 
 ## Descrição geral
 
-Preencha esta seção com uma visão geral do projeto, incluindo o problema estudado, sua relevância, os objetivos e, quando definido, o conjunto de dados que será utilizado. Não inclua aqui resultados que ainda não tenham sido obtidos ou avaliados pela equipe.
+A idéia do projeto é utilizar dados de partidas de CS da plataforma Gamers Club para analisar o desempenho dos jogadores e desenvolver uma solução de Machine Learning voltada à previsão da quantidade de kills realizadas em uma partida. O problema será abordado como uma tarefa de regressão, utilizando a variável qtKill como variável alvo.
 
 ## Estrutura do repositório
 
