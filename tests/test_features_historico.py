@@ -20,7 +20,6 @@ def _dados():
         'qtRoundsPlayed': [20, 25, 30, 15],
         'flWinner':       [1, 0, 1, 0],
         'vlLevel':        [5, 6, 6, 3],
-        'descMapName':    ['a', 'b', 'a', 'a'],
     })
 
 
@@ -66,12 +65,6 @@ def test_nivel_e_o_da_partida_anterior():
     assert j.loc[2, 'nivelAnterior'] == 6
 
 
-def test_media_no_mapa_considera_so_o_mesmo_mapa():
-    j = _jogador_10()
-    assert pd.isna(j.loc[1, 'mediaKillsMapa_hist'])   # 1ª vez no mapa b
-    assert j.loc[2, 'mediaKillsMapa_hist'] == 10      # mapa a: só a 1ª partida
-
-
 def test_mudar_a_partida_atual_nao_altera_suas_features():
     base = criar_features_historico(_dados())
     alterado = _dados()
@@ -92,7 +85,7 @@ def test_filtro_do_minimo_de_partidas():
         'dtCreatedAt': pd.date_range('2020-01-01', periods=7),
         'qtKill': [10] * 7, 'qtShots': [100] * 7, 'vlDamage': [1000] * 7,
         'qtHitHeadshot': [5] * 7, 'qtRoundsPlayed': [20] * 7, 'flWinner': [1] * 7,
-        'vlLevel': [5] * 7, 'descMapName': ['a'] * 7,
+        'vlLevel': [5] * 7,
     })
     df = filtrar_minimo_partidas(criar_features_historico(dados))
     assert list(df['qtdAnteriores']) == [5, 6]

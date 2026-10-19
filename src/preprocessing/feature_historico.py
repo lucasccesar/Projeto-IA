@@ -57,12 +57,6 @@ def razao_historica(df, numerador, denominador, janela=None):
     return soma(numerador) / soma(denominador).replace(0, np.nan)
 
 
-def media_historica_no_mapa(df, coluna):
-    """Média da coluna nas partidas anteriores do jogador no mesmo mapa da partida."""
-    g = df.groupby(['idPlayer', 'descMapName'])[coluna]
-    return g.transform(lambda s: s.shift(1).expanding().mean())
-
-
 def ordenar_por_tempo(df):
     """Ordena por jogador e data. O histórico depende dessa ordem."""
     df = df.copy()
@@ -94,9 +88,8 @@ def criar_features_historico(df):
         for sufixo, janela in JANELAS:
             df[f'{nome}_{sufixo}'] = razao_historica(df, numerador, denominador, janela)
 
-    # Consistência e mapa
+    # Consistência
     df['desvioKills_20'] = desvio_historico(df, 'qtKill', JANELA_LONGA)
-    df['mediaKillsMapa_hist'] = media_historica_no_mapa(df, 'qtKill')
 
     return df
 
