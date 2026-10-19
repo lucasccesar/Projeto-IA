@@ -4,6 +4,18 @@ import pandas as pd
 JANELA_CURTA = 5
 JANELA_LONGA = 20
 MIN_PARTIDAS = 5
+REQUIRED_FEATURE_COLUMNS = (
+    'idPlayer',
+    'idLobbyGame',
+    'dtCreatedAt',
+    'qtKill',
+    'vlDamage',
+    'qtHitHeadshot',
+    'qtRoundsPlayed',
+    'flWinner',
+    'qtShots',
+    'vlLevel',
+)
 
 # Janelas usadas nas médias: últimas 5, últimas 20 e todo o histórico (None)
 JANELAS = [('5', JANELA_CURTA), ('20', JANELA_LONGA), ('hist', None)]

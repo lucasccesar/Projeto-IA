@@ -14,6 +14,69 @@ from src.preprocessing.data_cleaning import (
 from src.preprocessing.feature_historico import criar_features_historico
 
 
+def _required_schema_dataframe():
+    return pd.DataFrame({
+        "idPlayer": [1, 2],
+        "idLobbyGame": [10, 11],
+        "dtCreatedAt": ["2022-01-01", "2022-01-02"],
+        "qtKill": [3, 4],
+        "vlDamage": [100.0, 200.0],
+        "qtHitHeadshot": pd.array([pd.NA, 2], dtype="Int64"),
+        "qtRoundsPlayed": [20, 25],
+        "flWinner": [1, 0],
+        "qtShots": [100, 120],
+        "vlLevel": [5, 6],
+    })
+
+
+@pytest.mark.parametrize("column", [
+    "idPlayer",
+    "idLobbyGame",
+    "dtCreatedAt",
+    "qtKill",
+    "vlDamage",
+    "qtHitHeadshot",
+    "qtRoundsPlayed",
+    "flWinner",
+    "qtShots",
+    "vlLevel",
+])
+def test_clean_dataset_rejects_missing_required_feature_column(column):
+    df = _required_schema_dataframe().drop(columns=[column])
+
+    with pytest.raises(ValueError, match="colunas obrigatórias ausentes") as error:
+        clean_dataset(df)
+
+    assert column in str(error.value)
+
+
+def test_validate_cleaned_dataset_marks_missing_required_columns_as_blocking():
+    df = _required_schema_dataframe().drop(columns=["idPlayer", "qtKill"])
+    df["dtCreatedAt"] = pd.to_datetime(df["dtCreatedAt"])
+
+    validation = validate_cleaned_dataset(df)
+
+    assert validation["is_valid"] is False
+    assert validation["blocking_issues"]["missing_required_columns"] == [
+        "idPlayer",
+        "qtKill",
+    ]
+
+
+def test_clean_dataset_accepts_required_schema_with_legitimate_missing_values():
+    df = _required_schema_dataframe()
+    original = df.copy(deep=True)
+
+    cleaned = clean_dataset(df)
+    validation = validate_cleaned_dataset(cleaned)
+
+    assert df.equals(original)
+    assert len(cleaned) == len(df)
+    assert pd.isna(cleaned.loc[0, "qtHitHeadshot"])
+    assert validation["is_valid"] is True
+    assert validation["blocking_issues"] == {}
+
+
 def test_identify_missing_values_reports_counts_without_filling():
     df = pd.DataFrame({
         "idPlayer": [1, 2],
@@ -114,6 +177,10 @@ def test_clean_dataset_does_not_change_input_fill_nulls_or_remove_outliers():
         "dtCreatedAt": ["2022-01-01", "2022-01-02"],
         "qtKill": pd.array([3, pd.NA], dtype="Int64"),
         "vlDamage": [12.5, 99999.0],
+        "qtHitHeadshot": [1, 2],
+        "qtRoundsPlayed": [20, 20],
+        "qtShots": [100, 100],
+        "vlLevel": [5, 5],
         "flWinner": [1, 0],
     })
     original = df.copy(deep=True)
@@ -134,6 +201,11 @@ def test_clean_dataset_reports_critical_validation_errors():
         "idPlayer": [1],
         "dtCreatedAt": ["2022-01-01"],
         "qtKill": [-1],
+        "vlDamage": [100.0],
+        "qtHitHeadshot": [1],
+        "qtRoundsPlayed": [20],
+        "qtShots": [100],
+        "vlLevel": [5],
         "flWinner": [1],
     })
 
@@ -164,6 +236,10 @@ def test_validation_keeps_review_flags_separate_from_blocking_issues():
         "qtHs": [2],
         "qtDeath": [3],
         "qtRoundsPlayed": [2],
+        "vlDamage": [100.0],
+        "qtHitHeadshot": [1],
+        "qtShots": [10],
+        "vlLevel": [5],
         "flWinner": [1],
     })
 

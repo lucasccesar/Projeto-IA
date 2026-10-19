@@ -1,5 +1,7 @@
 import pandas as pd
 
+from src.preprocessing.feature_historico import REQUIRED_FEATURE_COLUMNS
+
 
 INTEGER_COLUMNS = (
     "idLobbyGame",
@@ -57,6 +59,7 @@ BLOCKING_ISSUE_LABELS = {
     "duplicate_rows": "linhas duplicadas",
     "duplicate_player_lobby": "duplicidades na combinação idPlayer e idLobbyGame",
     "date_columns_not_datetime": "colunas de data sem tipo datetime",
+    "missing_required_columns": "colunas obrigatórias ausentes",
 }
 
 
@@ -204,6 +207,14 @@ def validate_cleaned_dataset(df):
     _ensure_dataframe(df)
     inconsistencies = detect_inconsistencies(df)
     blocking_issues = {}
+
+    missing_required_columns = [
+        column
+        for column in REQUIRED_FEATURE_COLUMNS
+        if column not in df.columns
+    ]
+    if missing_required_columns:
+        blocking_issues["missing_required_columns"] = missing_required_columns
 
     for name in (
         "negative_values",
