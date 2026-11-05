@@ -1,0 +1,4 @@
+regra,partidas,minimo_partidas_anteriores,MAE,RMSE
+media,172863,5,5.384737,6.957770
+minimo,172863,5,14.717354,16.634985
+maximo,172863,5,19.356097,21.658081

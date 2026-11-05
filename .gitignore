@@ -62,6 +62,7 @@ results/figures/*
 !results/figures/.gitkeep
 results/metrics/*
 !results/metrics/.gitkeep
+!results/metrics/baseline_kills.csv
 
 # Artefatos comuns de modelos e dados grandes
 *.pkl

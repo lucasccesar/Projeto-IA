@@ -16,6 +16,24 @@ Template educacional para o desenvolvimento de um projeto acadêmico de Machine 
 
 A idéia do projeto é utilizar dados de partidas de CS da plataforma Gamers Club para analisar o desempenho dos jogadores e desenvolver uma solução de Machine Learning voltada à previsão da quantidade de kills realizadas em uma partida. O problema será abordado como uma tarefa de regressão, utilizando a variável qtKill como variável alvo.
 
+## Definição da baseline
+
+A baseline prevê as kills (`qtKill`) de uma partida usando **somente as partidas anteriores do mesmo jogador**. Foram comparadas três regras sobre todo o histórico anterior: média, mínimo e máximo de kills. Os registros são ordenados por jogador, data e ID do lobby; a partida prevista fica fora do cálculo. **A avaliação considera apenas partidas com pelo menos cinco partidas anteriores**, seguindo o critério da engenharia de features. Linhas sem valor de kills ou sem previsão válida ficam fora da avaliação, de forma igual para as três regras.
+
+| Regra | Partidas avaliadas | MAE | RMSE |
+| --- | ---: | ---: | ---: |
+| Média histórica | 172.863 | 5,385 | 6,958 |
+| Mínimo histórico | 172.863 | 14,717 | 16,635 |
+| Máximo histórico | 172.863 | 19,356 | 21,658 |
+
+A **média histórica** é a baseline escolhida porque teve os menores erros nas duas métricas. MAE é a média do erro absoluto em kills; RMSE também mede o erro em kills, dando mais peso a erros grandes. Os resultados completos estão em [`results/metrics/baseline_kills.csv`](results/metrics/baseline_kills.csv). Para reproduzi-los, coloque `tb_lobby_stats_player.csv` em `data/raw/` e execute na raiz do projeto:
+
+```bash
+python -m src.models.baseline
+```
+
+O comando recalcula as previsões e sobrescreve apenas o arquivo de métricas. Ele não altera o dataset original. Para comparar um modelo posterior com a baseline, use as mesmas partidas elegíveis e métricas.
+
 ## Estrutura do repositório
 
 ```text
