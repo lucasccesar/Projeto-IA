@@ -83,6 +83,20 @@ def identify_missing_values(df):
     })
 
 
+def remove_missing_model_records(df, input_columns, target_column):
+    _ensure_dataframe(df)
+    if isinstance(input_columns, str):
+        input_columns = [input_columns]
+    selected_columns = list(dict.fromkeys([*input_columns, target_column]))
+    missing_columns = [
+        column for column in selected_columns if column not in df.columns
+    ]
+    if missing_columns:
+        columns_text = ", ".join(missing_columns)
+        raise ValueError(f"Colunas selecionadas ausentes: {columns_text}.")
+    return df.dropna(subset=selected_columns).copy(deep=True)
+
+
 def identify_duplicates(df, subset=None):
     _ensure_dataframe(df)
     duplicate_mask = df.duplicated(subset=subset, keep=False)

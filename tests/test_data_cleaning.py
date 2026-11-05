@@ -1,6 +1,7 @@
 import pandas as pd
 import pytest
 
+from src.preprocessing import data_cleaning
 from src.preprocessing.data_cleaning import (
     apply_cleaning,
     clean_dataset,
@@ -27,6 +28,84 @@ def _required_schema_dataframe():
         "qtShots": [100, 120],
         "vlLevel": [5, 6],
     })
+
+
+def test_remove_missing_model_records_filters_selected_inputs_and_target():
+    df = pd.DataFrame({
+        "history_feature": [1.0, pd.NA, 3.0],
+        "second_feature": [4.0, 5.0, 6.0],
+        "target": [7.0, 8.0, pd.NA],
+    })
+
+    filtered = data_cleaning.remove_missing_model_records(
+        df,
+        input_columns=["history_feature", "second_feature"],
+        target_column="target",
+    )
+
+    assert list(filtered.index) == [0]
+    assert filtered[["history_feature", "second_feature", "target"]].isna().sum().sum() == 0
+
+
+def test_remove_missing_model_records_preserves_complete_records():
+    df = pd.DataFrame({
+        "history_feature": [1.0, 2.0],
+        "target": [7.0, 8.0],
+    })
+
+    filtered = data_cleaning.remove_missing_model_records(
+        df,
+        input_columns=["history_feature"],
+        target_column="target",
+    )
+
+    assert len(filtered) == len(df)
+    assert filtered.reset_index(drop=True).equals(df)
+
+
+def test_remove_missing_model_records_uses_only_selected_columns():
+    df = pd.DataFrame({
+        "history_feature": [1.0, 2.0],
+        "target": [7.0, 8.0],
+        "unused_column": [pd.NA, 10.0],
+    })
+
+    filtered = data_cleaning.remove_missing_model_records(
+        df,
+        input_columns=["history_feature"],
+        target_column="target",
+    )
+
+    assert list(filtered.index) == [0, 1]
+    assert filtered["unused_column"].isna().sum() == 1
+
+
+def test_remove_missing_model_records_preserves_input_dataframe():
+    df = pd.DataFrame({
+        "history_feature": [1.0, pd.NA],
+        "target": [7.0, 8.0],
+    })
+    original = df.copy(deep=True)
+
+    filtered = data_cleaning.remove_missing_model_records(
+        df,
+        input_columns=["history_feature"],
+        target_column="target",
+    )
+
+    assert filtered is not df
+    assert df.equals(original)
+
+
+def test_remove_missing_model_records_reports_missing_selected_columns():
+    df = pd.DataFrame({"target": [1.0]})
+
+    with pytest.raises(ValueError, match="Colunas selecionadas ausentes"):
+        data_cleaning.remove_missing_model_records(
+            df,
+            input_columns=["missing_feature"],
+            target_column="target",
+        )
 
 
 @pytest.mark.parametrize("column", [
