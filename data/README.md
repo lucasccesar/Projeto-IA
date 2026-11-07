@@ -19,7 +19,15 @@ python -m src.data.dataset_final
 
 O comando gera `data/processed/tb_lobby_stats_player_final.csv` sem alterar o arquivo original. Ele aplica a limpeza e a validação estrutural, cria as features a partir das partidas anteriores do mesmo jogador, mantém linhas com pelo menos cinco partidas anteriores e remove as que têm ausência nas entradas ou no alvo. A partida que está sendo prevista fornece apenas o alvo `qtKill`; suas estatísticas não entram nas features.
 
-O CSV contém **29 colunas**: 25 features históricas para o modelo, `qtKill` como alvo e `idPlayer`, `idLobbyGame` e `dtCreatedAt` para identificação e divisão por data. As três colunas de contexto **não devem ser usadas como entradas do modelo**. Ao ler o CSV, converta `dtCreatedAt` para data (por exemplo, `pd.read_csv(caminho, parse_dates=["dtCreatedAt"])`).
+O CSV contém **29 colunas**: 25 features históricas para o modelo, `qtKill` como alvo e `idPlayer`, `idLobbyGame` e `dtCreatedAt` para identificação e divisão por data. As três colunas de contexto **não devem ser usadas como entradas do modelo**. Para carregá-lo com `dtCreatedAt` já convertido em data e validar o conteúdo, use:
+
+```python
+from src.data.dataset_final import carregar_dataset_final
+
+df = carregar_dataset_final()
+```
+
+O CSV armazena a data como texto; a conversão para `datetime` acontece automaticamente nessa função de leitura.
 
 Para separar entradas e alvo no treinamento, use `list(FEATURE_COLUMNS)` do módulo `src.preprocessing.feature_historico` como seleção de colunas de `X` e `qtKill` como `y`. A divisão temporal pode ser aplicada ao CSV carregado com `dividir_por_tempo` de `src.preprocessing.separacao_dados`.
 

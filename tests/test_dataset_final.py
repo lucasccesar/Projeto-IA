@@ -6,6 +6,7 @@ from src.data.dataset_final import (
     FEATURE_COLUMNS,
     FINAL_COLUMNS,
     TARGET_COLUMN,
+    carregar_dataset_final,
     gerar_dataset_final,
     preparar_dataset_final,
 )
@@ -74,7 +75,10 @@ def test_gera_csv_reproduzivel_em_processed(tmp_path):
     assert saida.exists()
     assert saida.read_bytes() == conteudo
     pd.testing.assert_frame_equal(primeiro, segundo)
-    assert pd.read_csv(saida).shape == (2, len(FINAL_COLUMNS))
+    carregado = carregar_dataset_final(saida)
+    assert carregado.shape == (2, len(FINAL_COLUMNS))
+    assert pd.api.types.is_datetime64_any_dtype(carregado["dtCreatedAt"])
+    assert carregado["dtCreatedAt"].tolist() == primeiro["dtCreatedAt"].tolist()
 
 
 def test_rejeita_inconsistencia_critica():

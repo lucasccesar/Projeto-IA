@@ -70,6 +70,16 @@ def gerar_dataset_final(entrada, saida):
     return final
 
 
+def carregar_dataset_final(caminho=None):
+    """Lê o CSV final com a data convertida e valida o resultado carregado."""
+    if caminho is None:
+        raiz = Path(__file__).resolve().parents[2]
+        caminho = raiz / "data/processed/tb_lobby_stats_player_final.csv"
+    final = pd.read_csv(caminho, parse_dates=["dtCreatedAt"])
+    validar_dataset_final(final)
+    return final
+
+
 def main():
     raiz = Path(__file__).resolve().parents[2]
     entrada = raiz / "data/raw/tb_lobby_stats_player.csv"
