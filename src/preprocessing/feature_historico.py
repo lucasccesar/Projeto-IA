@@ -35,6 +35,13 @@ RAZOES = {
     'killsPorRound': ('qtKill', 'qtRoundsPlayed'),
 }
 
+FEATURE_COLUMNS = (
+    'qtdAnteriores', 'killsUltimaPartida', 'nivelAnterior',
+    *(f'{nome}_{sufixo}' for nome in MEDIAS for sufixo, _ in JANELAS),
+    *(f'{nome}_{sufixo}' for nome in RAZOES for sufixo, _ in JANELAS),
+    'desvioKills_20',
+)
+
 
 def media_historica(df, coluna, janela=None):
     """Média da coluna nas partidas anteriores do jogador (a atual não entra).
