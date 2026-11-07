@@ -4,6 +4,7 @@ from pathlib import Path
 
 import pandas as pd
 
+from src.data.dataset_final import preparar_dataset_final
 from src.preprocessing.feature_historico import JANELA_LONGA, MIN_PARTIDAS, ordenar_por_tempo
 from src.preprocessing.separacao_dados import dividir_por_tempo
 
@@ -42,24 +43,37 @@ def prever_baselines(df):
     return partidas
 
 
-def avaliar_baselines(previsoes, minimo_partidas=MIN_PARTIDAS):
-    """Calcula MAE e RMSE apenas na validação definida pela divisão temporal."""
+def avaliar_baselines(previsoes, dataset_final, minimo_partidas=MIN_PARTIDAS):
+    """Avalia as regras nas mesmas partidas de validação do dataset final."""
     colunas = [f"previsao_{nome}" for nome in REGRAS]
-    elegiveis = previsoes.loc[previsoes["qtdAnteriores"] >= minimo_partidas]
-    if elegiveis.empty:
-        raise ValueError("Não há partidas elegíveis para dividir os dados.")
-    _, validacao, _ = dividir_por_tempo(elegiveis)
-    validacao = validacao.dropna(subset=["qtKill", *colunas])
+    _, validacao, _ = dividir_por_tempo(dataset_final)
     if validacao.empty:
-        raise ValueError("Não há partidas válidas no conjunto de validação.")
+        raise ValueError("Não há partidas no conjunto de validação.")
+    if (validacao["qtdAnteriores"] < minimo_partidas).any():
+        raise ValueError("A validação contém jogadores sem histórico suficiente.")
+
+    chaves = ["idPlayer", "idLobbyGame"]
+    origem = previsoes[chaves + ["dtCreatedAt", "qtKill", *colunas]].rename(
+        columns={"dtCreatedAt": "data_origem", "qtKill": "kills_origem"}
+    )
+    avaliadas = validacao[chaves + ["dtCreatedAt", "qtKill"]].merge(
+        origem, on=chaves, how="left", validate="one_to_one", indicator=True
+    )
+    if (avaliadas["_merge"] != "both").any() or avaliadas[colunas].isna().any().any():
+        raise ValueError("Faltam previsões para partidas do conjunto de validação.")
+    if not (
+        avaliadas["dtCreatedAt"].eq(avaliadas["data_origem"]).all()
+        and avaliadas["qtKill"].eq(avaliadas["kills_origem"]).all()
+    ):
+        raise ValueError("O dataset final e as previsões têm partidas divergentes.")
 
     resultados = []
     for nome in REGRAS:
-        erros = validacao["qtKill"] - validacao[f"previsao_{nome}"]
+        erros = avaliadas["qtKill"] - avaliadas[f"previsao_{nome}"]
         resultados.append({
             "conjunto": "validacao",
             "regra": nome,
-            "partidas": len(validacao),
+            "partidas": len(avaliadas),
             "minimo_partidas_anteriores": minimo_partidas,
             "MAE": erros.abs().mean(),
             "RMSE": (erros.pow(2).mean()) ** 0.5,
@@ -72,7 +86,8 @@ def main():
     entrada = raiz / "data/raw/tb_lobby_stats_player.csv"
     saida = raiz / "results/metrics/baseline_kills.csv"
     dados = pd.read_csv(entrada)
-    metricas = avaliar_baselines(prever_baselines(dados))
+    dataset_final = preparar_dataset_final(dados)
+    metricas = avaliar_baselines(prever_baselines(dados), dataset_final)
     saida.parent.mkdir(parents=True, exist_ok=True)
     metricas.to_csv(saida, index=False, float_format="%.6f")
     print(metricas.to_string(index=False, float_format=lambda valor: f"{valor:.3f}"))
