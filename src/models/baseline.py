@@ -4,14 +4,15 @@ from pathlib import Path
 
 import pandas as pd
 
-from src.preprocessing.feature_historico import MIN_PARTIDAS, ordenar_por_tempo
+from src.preprocessing.feature_historico import JANELA_LONGA, MIN_PARTIDAS, ordenar_por_tempo
 from src.preprocessing.separacao_dados import dividir_por_tempo
 
 
 REGRAS = {
-    "media": "mean",
-    "minimo": "min",
-    "maximo": "max",
+    "media": ("mean", None),
+    "media_20": ("mean", JANELA_LONGA),
+    "minimo": ("min", None),
+    "maximo": ("max", None),
 }
 
 
@@ -28,10 +29,15 @@ def prever_baselines(df):
         lambda s: s.shift(1)
     )
 
-    for nome, operacao in REGRAS.items():
+    for nome, (operacao, janela) in REGRAS.items():
         partidas[f"previsao_{nome}"] = kills_anteriores.groupby(
             partidas["idPlayer"]
-        ).transform(lambda s: getattr(s.expanding(), operacao)())
+        ).transform(
+            lambda s: getattr(
+                s.expanding() if janela is None else s.rolling(janela, min_periods=1),
+                operacao,
+            )()
+        )
 
     return partidas
 

@@ -1,4 +1,5 @@
 conjunto,regra,partidas,minimo_partidas_anteriores,MAE,RMSE
 validacao,media,25929,5,5.411546,6.974612
+validacao,media_20,25929,5,5.465348,7.041072
 validacao,minimo,25929,5,15.515446,17.335291
 validacao,maximo,25929,5,21.094180,23.281655
