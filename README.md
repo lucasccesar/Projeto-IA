@@ -49,6 +49,8 @@ O comando recria o dataset final em memória, recalcula as previsões e sobrescr
 │   ├── processed/
 │   │   └── .gitkeep
 │   └── README.md
+├── docs/
+│   └── modelos_regressao.md
 ├── notebooks/
 │   └── .gitkeep
 ├── src/
@@ -80,6 +82,7 @@ O comando recria o dataset final em memória, recalcula as previsões e sobrescr
 
 - `data/raw/`: datasets originais, sem alterações. Os arquivos de dados não devem ser versionados por padrão.
 - `data/processed/`: dados gerados por limpeza, transformação ou preparação. Esses arquivos também não devem ser versionados por padrão.
+- `docs/`: documentos de decisões do projeto, como a seleção dos modelos de regressão.
 - `notebooks/`: análises exploratórias, experimentos e registros de investigação em Jupyter.
 - `src/data/`: código reutilizável de carregamento e manipulação inicial dos dados.
 - `src/preprocessing/`: código reutilizável de pré-processamento.
