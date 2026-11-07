@@ -1,0 +1,2 @@
+K_escolhido,distancia,MAE_validacao,MAE_teste,RMSE_teste,R2_teste,MAE_baseline
+300,manhattan,5.233590574677162,5.3614594587642115,6.903929135432528,0.12508215239077014,5.412

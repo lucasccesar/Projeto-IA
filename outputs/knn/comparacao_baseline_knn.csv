@@ -1,0 +1,3 @@
+Modelo,MAE teste,Diferença para baseline
+Baseline,5.412,0.0
+KNN,5.3614594587642115,-0.05054054123578844
