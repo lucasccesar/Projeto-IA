@@ -16,6 +16,25 @@ Template educacional para o desenvolvimento de um projeto acadêmico de Machine 
 
 A idéia do projeto é utilizar dados de partidas de CS da plataforma Gamers Club para analisar o desempenho dos jogadores e desenvolver uma solução de Machine Learning voltada à previsão da quantidade de kills realizadas em uma partida. O problema será abordado como uma tarefa de regressão, utilizando a variável qtKill como variável alvo.
 
+## Definição da baseline
+
+A baseline prevê as kills (`qtKill`) de uma partida usando **somente as partidas anteriores do mesmo jogador**. Foram comparadas quatro regras: média de todo o histórico anterior, média das últimas 20 partidas anteriores (`media_20`), mínimo e máximo de todo o histórico anterior. A regra `media_20` usa as partidas disponíveis quando o jogador ainda não tem 20. Os registros são ordenados por jogador, data e ID do lobby; a partida prevista fica fora do cálculo. Primeiro são criadas as previsões históricas e mantidas apenas as partidas com pelo menos cinco anteriores. Depois, a função `dividir_por_tempo` aplica a mesma separação por data dos demais modelos: 70% para treino, 15% para validação e 15% para teste. **As métricas abaixo usam somente a validação**. Linhas sem valor de kills ou sem previsão válida ficam fora da avaliação, de forma igual para as quatro regras. Partidas do teste não entram nas métricas nem no histórico das partidas de validação.
+
+| Regra | Partidas avaliadas | MAE | RMSE |
+| --- | ---: | ---: | ---: |
+| Média histórica | 25.929 | 5,412 | 6,975 |
+| Média das últimas 20 partidas | 25.929 | 5,465 | 7,041 |
+| Mínimo histórico | 25.929 | 15,515 | 17,335 |
+| Máximo histórico | 25.929 | 21,094 | 23,282 |
+
+A **média histórica** é a baseline principal porque teve os menores erros nas duas métricas. A média das últimas 20 partidas também é registrada para comparação com a referência descrita no [documento de modelos](https://github.com/lucasccesar/Projeto-IA/pull/24). MAE é a média do erro absoluto em kills; RMSE também mede o erro em kills, dando mais peso a erros grandes. Os resultados completos estão em [`results/metrics/baseline_kills.csv`](results/metrics/baseline_kills.csv). Para reproduzi-los, coloque `tb_lobby_stats_player.csv` em `data/raw/` e execute na raiz do projeto:
+
+```bash
+python -m src.models.baseline
+```
+
+O comando recalcula as previsões e sobrescreve apenas o arquivo de métricas. Ele não altera o dataset original. Para comparar um modelo posterior com a baseline, use as mesmas linhas de validação e métricas.
+
 ## Estrutura do repositório
 
 ```text
