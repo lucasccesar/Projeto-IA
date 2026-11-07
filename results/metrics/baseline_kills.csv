@@ -1,4 +1,4 @@
-regra,partidas,minimo_partidas_anteriores,MAE,RMSE
-media,172863,5,5.384737,6.957770
-minimo,172863,5,14.717354,16.634985
-maximo,172863,5,19.356097,21.658081
+conjunto,regra,partidas,minimo_partidas_anteriores,MAE,RMSE
+validacao,media,25929,5,5.411546,6.974612
+validacao,minimo,25929,5,15.515446,17.335291
+validacao,maximo,25929,5,21.094180,23.281655

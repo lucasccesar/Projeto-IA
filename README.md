@@ -18,13 +18,13 @@ A idéia do projeto é utilizar dados de partidas de CS da plataforma Gamers Clu
 
 ## Definição da baseline
 
-A baseline prevê as kills (`qtKill`) de uma partida usando **somente as partidas anteriores do mesmo jogador**. Foram comparadas três regras sobre todo o histórico anterior: média, mínimo e máximo de kills. Os registros são ordenados por jogador, data e ID do lobby; a partida prevista fica fora do cálculo. **A avaliação considera apenas partidas com pelo menos cinco partidas anteriores**, seguindo o critério da engenharia de features. Linhas sem valor de kills ou sem previsão válida ficam fora da avaliação, de forma igual para as três regras.
+A baseline prevê as kills (`qtKill`) de uma partida usando **somente as partidas anteriores do mesmo jogador**. Foram comparadas três regras sobre todo o histórico anterior: média, mínimo e máximo de kills. Os registros são ordenados por jogador, data e ID do lobby; a partida prevista fica fora do cálculo. Primeiro são criadas as previsões históricas e mantidas apenas as partidas com pelo menos cinco anteriores. Depois, a função `dividir_por_tempo` aplica a mesma separação por data dos demais modelos: 70% para treino, 15% para validação e 15% para teste. **As métricas abaixo usam somente a validação**. Linhas sem valor de kills ou sem previsão válida ficam fora da avaliação, de forma igual para as três regras. Partidas do teste não entram nas métricas nem no histórico das partidas de validação.
 
 | Regra | Partidas avaliadas | MAE | RMSE |
 | --- | ---: | ---: | ---: |
-| Média histórica | 172.863 | 5,385 | 6,958 |
-| Mínimo histórico | 172.863 | 14,717 | 16,635 |
-| Máximo histórico | 172.863 | 19,356 | 21,658 |
+| Média histórica | 25.929 | 5,412 | 6,975 |
+| Mínimo histórico | 25.929 | 15,515 | 17,335 |
+| Máximo histórico | 25.929 | 21,094 | 23,282 |
 
 A **média histórica** é a baseline escolhida porque teve os menores erros nas duas métricas. MAE é a média do erro absoluto em kills; RMSE também mede o erro em kills, dando mais peso a erros grandes. Os resultados completos estão em [`results/metrics/baseline_kills.csv`](results/metrics/baseline_kills.csv). Para reproduzi-los, coloque `tb_lobby_stats_player.csv` em `data/raw/` e execute na raiz do projeto:
 
@@ -32,7 +32,7 @@ A **média histórica** é a baseline escolhida porque teve os menores erros nas
 python -m src.models.baseline
 ```
 
-O comando recalcula as previsões e sobrescreve apenas o arquivo de métricas. Ele não altera o dataset original. Para comparar um modelo posterior com a baseline, use as mesmas partidas elegíveis e métricas.
+O comando recalcula as previsões e sobrescreve apenas o arquivo de métricas. Ele não altera o dataset original. Para comparar um modelo posterior com a baseline, use as mesmas linhas de validação e métricas.
 
 ## Estrutura do repositório
 

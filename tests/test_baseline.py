@@ -39,11 +39,18 @@ def test_partida_atual_nao_muda_sua_previsao():
 
 
 def test_metricas_comparam_as_tres_regras_nas_mesmas_linhas():
-    metricas = avaliar_baselines(prever_baselines(_partidas()))
+    partidas = pd.DataFrame({
+        "idLobbyGame": range(1, 21),
+        "idPlayer": [1] * 20,
+        "dtCreatedAt": pd.date_range("2022-01-01", periods=20),
+        "qtKill": range(20),
+    })
+    metricas = avaliar_baselines(prever_baselines(partidas))
+    assert metricas["conjunto"].tolist() == ["validacao"] * 3
     assert metricas["regra"].tolist() == ["media", "minimo", "maximo"]
-    assert metricas["partidas"].tolist() == [1, 1, 1]
-    np.testing.assert_allclose(metricas["MAE"], [20, 30, 10])
-    np.testing.assert_allclose(metricas["RMSE"], [20, 30, 10])
+    assert metricas["partidas"].tolist() == [2, 2, 2]
+    np.testing.assert_allclose(metricas["MAE"], [8.25, 15.5, 1])
+    np.testing.assert_allclose(metricas["RMSE"], [np.sqrt((8**2 + 8.5**2) / 2), np.sqrt((15**2 + 16**2) / 2), 1])
 
 
 def test_sem_partidas_elegiveis_falha_com_mensagem():

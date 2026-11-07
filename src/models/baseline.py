@@ -5,6 +5,7 @@ from pathlib import Path
 import pandas as pd
 
 from src.preprocessing.feature_historico import MIN_PARTIDAS, ordenar_por_tempo
+from src.preprocessing.separacao_dados import dividir_por_tempo
 
 
 REGRAS = {
@@ -36,21 +37,23 @@ def prever_baselines(df):
 
 
 def avaliar_baselines(previsoes, minimo_partidas=MIN_PARTIDAS):
-    """Calcula MAE e RMSE nas mesmas partidas elegíveis para todas as regras."""
+    """Calcula MAE e RMSE apenas na validação definida pela divisão temporal."""
     colunas = [f"previsao_{nome}" for nome in REGRAS]
-    elegiveis = previsoes.loc[
-        (previsoes["qtdAnteriores"] >= minimo_partidas)
-        & previsoes[["qtKill", *colunas]].notna().all(axis=1)
-    ]
+    elegiveis = previsoes.loc[previsoes["qtdAnteriores"] >= minimo_partidas]
     if elegiveis.empty:
-        raise ValueError("Não há partidas elegíveis para avaliar o baseline.")
+        raise ValueError("Não há partidas elegíveis para dividir os dados.")
+    _, validacao, _ = dividir_por_tempo(elegiveis)
+    validacao = validacao.dropna(subset=["qtKill", *colunas])
+    if validacao.empty:
+        raise ValueError("Não há partidas válidas no conjunto de validação.")
 
     resultados = []
     for nome in REGRAS:
-        erros = elegiveis["qtKill"] - elegiveis[f"previsao_{nome}"]
+        erros = validacao["qtKill"] - validacao[f"previsao_{nome}"]
         resultados.append({
+            "conjunto": "validacao",
             "regra": nome,
-            "partidas": len(elegiveis),
+            "partidas": len(validacao),
             "minimo_partidas_anteriores": minimo_partidas,
             "MAE": erros.abs().mean(),
             "RMSE": (erros.pow(2).mean()) ** 0.5,
