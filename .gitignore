@@ -57,12 +57,10 @@ data/raw/*
 data/processed/*
 !data/processed/.gitkeep
 
-# Resultados e artefatos gerados: mantenha apenas os marcadores
+# Figuras geradas: mantenha apenas o marcador
+# (os arquivos de results/metrics/ são versionados)
 results/figures/*
 !results/figures/.gitkeep
-results/metrics/*
-!results/metrics/.gitkeep
-!results/metrics/baseline_kills.csv
 
 # Artefatos comuns de modelos e dados grandes
 *.pkl
