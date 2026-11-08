@@ -1,0 +1,2 @@
+conjunto,modelo,max_depth,min_samples_leaf,partidas,MAE,RMSE,R2
+validacao,arvore_decisao,6,50,25916,5.393073,6.962905,0.149655

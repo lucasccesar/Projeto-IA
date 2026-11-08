@@ -50,6 +50,7 @@ O comando recria o dataset final em memória, recalcula as previsões e sobrescr
 │   │   └── .gitkeep
 │   └── README.md
 ├── docs/
+│   ├── arvore_decisao.md
 │   └── modelos_regressao.md
 ├── notebooks/
 │   └── .gitkeep
