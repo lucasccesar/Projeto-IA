@@ -1,0 +1,2 @@
+conjunto,modelo,k,distancia,partidas,MAE,RMSE,R2
+validacao,knn,300,manhattan,25916,5.377264,6.935334,0.156376

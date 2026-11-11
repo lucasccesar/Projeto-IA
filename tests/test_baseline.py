@@ -3,6 +3,7 @@ import pandas as pd
 import pytest
 
 from src.models.baseline import avaliar_baselines, prever_baselines
+from src.preprocessing.feature_historico import media_historica, ordenar_por_tempo
 from src.preprocessing.separacao_dados import dividir_por_tempo
 
 
@@ -29,6 +30,17 @@ def test_previsoes_usam_apenas_historico_do_mesmo_jogador():
     assert jogador.loc[5, "previsao_maximo"] == 20
     outro = resultado.loc[resultado["idPlayer"] == 2].reset_index(drop=True)
     assert outro.loc[1, "previsao_media"] == 50
+
+
+def test_baseline_da_media_e_a_feature_de_media_historica():
+    partidas = ordenar_por_tempo(_partidas())
+    resultado = prever_baselines(_partidas())
+    pd.testing.assert_series_equal(
+        resultado["previsao_media"], media_historica(partidas, "qtKill"), check_names=False
+    )
+    pd.testing.assert_series_equal(
+        resultado["previsao_media_20"], media_historica(partidas, "qtKill", 20), check_names=False
+    )
 
 
 def test_partida_atual_nao_muda_sua_previsao():
@@ -67,6 +79,9 @@ def test_metricas_comparam_as_quatro_regras_nas_mesmas_linhas():
     assert metricas["partidas"].tolist() == [2] * 4
     np.testing.assert_allclose(metricas["MAE"], [8.25, 8.25, 15.5, 1])
     np.testing.assert_allclose(metricas["RMSE"], [np.sqrt((8**2 + 8.5**2) / 2)] * 2 + [np.sqrt((15**2 + 16**2) / 2), 1])
+    assert list(metricas.columns) == [
+        "conjunto", "regra", "partidas", "minimo_partidas_anteriores", "MAE", "RMSE", "R2",
+    ]
 
 
 def test_avaliacao_respeita_linhas_excluidas_do_dataset_final():

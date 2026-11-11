@@ -1,7 +1,17 @@
+"""Limpeza e validação estrutural do dataset bruto.
+
+A limpeza apenas converte tipos: não preenche valores ausentes, não remove
+linhas e não remove valores extremos. A validação separa dois tipos de problema:
+
+- bloqueios (`blocking_issues`): impedem o uso dos dados e geram erro em `clean_dataset`;
+- sinais para revisão (`review_flags`): relações suspeitas entre colunas, que são
+  apenas contadas porque podem ser partidas legítimas.
+"""
+
 import pandas as pd
 
+from src.data.colunas import DATE_COLUMN, KEY_COLUMNS
 from src.preprocessing.feature_historico import REQUIRED_FEATURE_COLUMNS
-
 
 INTEGER_COLUMNS = (
     "idLobbyGame",
@@ -34,22 +44,34 @@ INTEGER_COLUMNS = (
     "qtHitHeadshot",
     "qtHitChest",
     "qtHitStomach",
-    "qtHitLeftAtm",
+    "qtHitLeftAtm",  # o nome vem assim do dataset original (seria LeftArm)
     "qtHitRightArm",
     "qtHitLeftLeg",
     "qtHitRightLeg",
     "flWinner",
 )
-
 NUMERIC_COLUMNS = ("vlDamage",)
-DATE_COLUMNS = ("dtCreatedAt",)
+DATE_COLUMNS = (DATE_COLUMN,)
 NON_NEGATIVE_COLUMNS = INTEGER_COLUMNS + NUMERIC_COLUMNS
+WINNER_COLUMN = "flWinner"
+
+# (nome do sinal, coluna que não deveria ser maior, coluna de referência)
 REVIEW_RELATIONS = (
     ("headshots_exceed_kills", "qtHs", "qtKill"),
     ("deaths_exceed_rounds", "qtDeath", "qtRoundsPlayed"),
     ("hits_exceed_shots", "qtHits", "qtShots"),
     ("headshot_hits_exceed_hits", "qtHitHeadshot", "qtHits"),
     ("kills_exceed_shots", "qtKill", "qtShots"),
+)
+
+# Inconsistências que bloqueiam o uso dos dados, na ordem em que são relatadas.
+BLOCKING_INCONSISTENCIES = (
+    "negative_values",
+    "invalid_numeric_values",
+    "invalid_dates",
+    "invalid_winner",
+    "duplicate_rows",
+    "duplicate_player_lobby",
 )
 BLOCKING_ISSUE_LABELS = {
     "negative_values": "valores negativos",
@@ -63,16 +85,36 @@ BLOCKING_ISSUE_LABELS = {
 }
 
 
-def _ensure_dataframe(df):
+def _ensure_dataframe(df) -> None:
     if not isinstance(df, pd.DataFrame):
         raise TypeError("A entrada deve ser um DataFrame.")
 
 
-def _numeric_series(series):
+def _to_numeric(series: pd.Series) -> pd.Series:
+    """Converte para número; o que não for conversível vira nulo."""
     return pd.to_numeric(series, errors="coerce")
 
 
-def identify_missing_values(df):
+def _to_datetime(series: pd.Series) -> pd.Series:
+    """Converte para data; o que não for conversível vira nulo."""
+    return pd.to_datetime(series, errors="coerce")
+
+
+def _invalid_mask(source: pd.Series, converted: pd.Series) -> pd.Series:
+    """Marca os valores preenchidos que viraram nulo na conversão, ou seja, os inválidos."""
+    return source.notna() & converted.isna()
+
+
+def _to_valid_numeric(df: pd.DataFrame, column: str) -> pd.Series:
+    """Converte a coluna para número e falha se houver valor não numérico."""
+    numeric = _to_numeric(df[column])
+    if _invalid_mask(df[column], numeric).any():
+        raise ValueError(f"A coluna {column} contém valores que não são numéricos.")
+    return numeric
+
+
+def identify_missing_values(df: pd.DataFrame) -> pd.DataFrame:
+    """Tabela com a quantidade e a proporção de valores ausentes em cada coluna."""
     _ensure_dataframe(df)
     total_rows = len(df)
     missing_count = df.isna().sum()
@@ -83,93 +125,95 @@ def identify_missing_values(df):
     })
 
 
-def remove_missing_model_records(df, input_columns, target_column):
+def remove_missing_model_records(
+    df: pd.DataFrame, input_columns, target_column: str
+) -> pd.DataFrame:
+    """Remove as linhas com valor ausente em alguma entrada do modelo ou no alvo.
+
+    Só as colunas selecionadas são consideradas; ausências nas demais são mantidas.
+    """
     _ensure_dataframe(df)
     if isinstance(input_columns, str):
         input_columns = [input_columns]
     selected_columns = list(dict.fromkeys([*input_columns, target_column]))
-    missing_columns = [
-        column for column in selected_columns if column not in df.columns
-    ]
+    missing_columns = [column for column in selected_columns if column not in df.columns]
     if missing_columns:
-        columns_text = ", ".join(missing_columns)
-        raise ValueError(f"Colunas selecionadas ausentes: {columns_text}.")
+        raise ValueError(f"Colunas selecionadas ausentes: {', '.join(missing_columns)}.")
     return df.dropna(subset=selected_columns).copy(deep=True)
 
 
-def identify_duplicates(df, subset=None):
+def identify_duplicates(df: pd.DataFrame, subset=None) -> pd.DataFrame:
+    """Retorna todas as linhas envolvidas em duplicidade (linha inteira ou nas colunas de `subset`)."""
     _ensure_dataframe(df)
     duplicate_mask = df.duplicated(subset=subset, keep=False)
     return df.loc[duplicate_mask].copy(deep=True)
 
 
-def convert_data_types(df):
+def convert_data_types(df: pd.DataFrame) -> pd.DataFrame:
+    """Converte contagens e identificadores para inteiro anulável (Int64) e o dano para número.
+
+    Valores ausentes são preservados. Falha se houver texto em coluna numérica
+    ou valor fracionário em coluna inteira.
+    """
     _ensure_dataframe(df)
     converted = df.copy(deep=True)
 
     for column in INTEGER_COLUMNS:
         if column not in converted.columns:
             continue
-        source = converted[column]
-        numeric = _numeric_series(source)
-        invalid_mask = source.notna() & numeric.isna()
-        if invalid_mask.any():
-            raise ValueError(f"A coluna {column} contém valores que não são numéricos.")
-        fractional_mask = numeric.notna() & numeric.mod(1).ne(0)
-        if fractional_mask.any():
+        numeric = _to_valid_numeric(converted, column)
+        if (numeric.notna() & numeric.mod(1).ne(0)).any():
             raise ValueError(f"A coluna {column} deve conter apenas valores inteiros.")
         converted[column] = numeric.astype("Int64")
 
     for column in NUMERIC_COLUMNS:
-        if column not in converted.columns:
-            continue
-        source = converted[column]
-        numeric = _numeric_series(source)
-        invalid_mask = source.notna() & numeric.isna()
-        if invalid_mask.any():
-            raise ValueError(f"A coluna {column} contém valores que não são numéricos.")
-        converted[column] = numeric
+        if column in converted.columns:
+            converted[column] = _to_valid_numeric(converted, column)
 
     return converted
 
 
-def convert_dates(df, columns=DATE_COLUMNS):
+def convert_dates(df: pd.DataFrame, columns=DATE_COLUMNS) -> pd.DataFrame:
+    """Converte as colunas de data para datetime e falha se houver data inválida."""
     _ensure_dataframe(df)
     converted = df.copy(deep=True)
 
     for column in columns:
         if column not in converted.columns:
             continue
-        source = converted[column]
-        parsed = pd.to_datetime(source, errors="coerce")
-        invalid_mask = source.notna() & parsed.isna()
-        if invalid_mask.any():
+        parsed = _to_datetime(converted[column])
+        if _invalid_mask(converted[column], parsed).any():
             raise ValueError(f"A coluna {column} contém datas inválidas.")
         converted[column] = parsed
 
     return converted
 
 
-def _relation_count(df, left_column, right_column):
+def _relation_count(df: pd.DataFrame, left_column: str, right_column: str) -> int:
+    """Quantidade de linhas em que `left_column` é maior que `right_column`."""
     if left_column not in df.columns or right_column not in df.columns:
         return 0
-    left = _numeric_series(df[left_column])
-    right = _numeric_series(df[right_column])
-    relation_mask = (left > right).fillna(False)
-    return int(relation_mask.sum())
+    left = _to_numeric(df[left_column])
+    right = _to_numeric(df[right_column])
+    return int((left > right).fillna(False).sum())
 
 
-def detect_inconsistencies(df):
+def detect_inconsistencies(df: pd.DataFrame) -> dict:
+    """Conta as inconsistências do dataset, sem alterá-lo.
+
+    Retorna um dicionário com contagens por coluna (valores negativos, números e
+    datas inválidos) e contagens gerais (flWinner fora de 0/1, duplicatas e as
+    relações suspeitas de REVIEW_RELATIONS).
+    """
     _ensure_dataframe(df)
+
     negative_values = {}
     invalid_numeric_values = {}
-
     for column in NON_NEGATIVE_COLUMNS:
         if column not in df.columns:
             continue
-        source = df[column]
-        numeric = _numeric_series(source)
-        invalid_mask = source.notna() & numeric.isna()
+        numeric = _to_numeric(df[column])
+        invalid_mask = _invalid_mask(df[column], numeric)
         if invalid_mask.any():
             invalid_numeric_values[column] = int(invalid_mask.sum())
         negative_mask = (numeric < 0).fillna(False)
@@ -180,30 +224,25 @@ def detect_inconsistencies(df):
     for column in DATE_COLUMNS:
         if column not in df.columns:
             continue
-        source = df[column]
-        parsed = pd.to_datetime(source, errors="coerce")
-        invalid_mask = source.notna() & parsed.isna()
+        invalid_mask = _invalid_mask(df[column], _to_datetime(df[column]))
         if invalid_mask.any():
             invalid_dates[column] = int(invalid_mask.sum())
 
     invalid_winner = 0
-    if "flWinner" in df.columns:
-        winner = _numeric_series(df["flWinner"])
-        invalid_mask = df["flWinner"].notna() & ~winner.isin([0, 1])
-        invalid_winner = int(invalid_mask.sum())
+    if WINNER_COLUMN in df.columns:
+        winner = _to_numeric(df[WINNER_COLUMN])
+        invalid_winner = int((df[WINNER_COLUMN].notna() & ~winner.isin([0, 1])).sum())
 
-    duplicate_rows = int(len(identify_duplicates(df)))
     duplicate_player_lobby = 0
-    key_columns = ["idPlayer", "idLobbyGame"]
-    if all(column in df.columns for column in key_columns):
-        duplicate_player_lobby = int(len(identify_duplicates(df, subset=key_columns)))
+    if all(column in df.columns for column in KEY_COLUMNS):
+        duplicate_player_lobby = len(identify_duplicates(df, subset=list(KEY_COLUMNS)))
 
     inconsistencies = {
         "negative_values": negative_values,
         "invalid_numeric_values": invalid_numeric_values,
         "invalid_dates": invalid_dates,
         "invalid_winner": invalid_winner,
-        "duplicate_rows": duplicate_rows,
+        "duplicate_rows": len(identify_duplicates(df)),
         "duplicate_player_lobby": duplicate_player_lobby,
     }
     for name, left_column, right_column in REVIEW_RELATIONS:
@@ -212,33 +251,28 @@ def detect_inconsistencies(df):
     return inconsistencies
 
 
-def apply_cleaning(df):
-    cleaned = convert_data_types(df)
-    return convert_dates(cleaned)
+def apply_cleaning(df: pd.DataFrame) -> pd.DataFrame:
+    """Aplica as conversões de tipo e de data, sem validar o resultado."""
+    return convert_dates(convert_data_types(df))
 
 
-def validate_cleaned_dataset(df):
+def validate_cleaned_dataset(df: pd.DataFrame) -> dict:
+    """Valida o dataset limpo e separa bloqueios de sinais para revisão.
+
+    Retorna um dicionário com `is_valid`, `blocking_issues`, `review_flags`,
+    `missing_values` (tabela de ausências), `rows` e `columns`.
+    """
     _ensure_dataframe(df)
     inconsistencies = detect_inconsistencies(df)
     blocking_issues = {}
 
     missing_required_columns = [
-        column
-        for column in REQUIRED_FEATURE_COLUMNS
-        if column not in df.columns
+        column for column in REQUIRED_FEATURE_COLUMNS if column not in df.columns
     ]
     if missing_required_columns:
         blocking_issues["missing_required_columns"] = missing_required_columns
 
-    for name in (
-        "negative_values",
-        "invalid_numeric_values",
-        "invalid_dates",
-    ):
-        if inconsistencies[name]:
-            blocking_issues[name] = inconsistencies[name]
-
-    for name in ("invalid_winner", "duplicate_rows", "duplicate_player_lobby"):
+    for name in BLOCKING_INCONSISTENCIES:
         if inconsistencies[name]:
             blocking_issues[name] = inconsistencies[name]
 
@@ -266,7 +300,8 @@ def validate_cleaned_dataset(df):
     }
 
 
-def _format_blocking_issues(blocking_issues):
+def _format_blocking_issues(blocking_issues: dict) -> str:
+    """Monta a mensagem de erro com os bloqueios encontrados."""
     details = []
     for name, value in blocking_issues.items():
         label = BLOCKING_ISSUE_LABELS.get(name, name)
@@ -280,7 +315,11 @@ def _format_blocking_issues(blocking_issues):
     return "A limpeza encontrou inconsistências críticas: " + "; ".join(details) + "."
 
 
-def clean_dataset(df):
+def clean_dataset(df: pd.DataFrame) -> pd.DataFrame:
+    """Retorna uma cópia limpa do dataset bruto, ou falha se houver bloqueio.
+
+    O DataFrame recebido não é alterado.
+    """
     _ensure_dataframe(df)
     cleaned = apply_cleaning(df)
     validation = validate_cleaned_dataset(cleaned)

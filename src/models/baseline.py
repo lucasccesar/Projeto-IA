@@ -1,14 +1,27 @@
-"""Baselines cronológicas para prever kills a partir do histórico do jogador."""
+"""Baselines cronológicas para prever kills a partir do histórico do jogador.
 
-from pathlib import Path
+São regras simples, sem treinamento, que servem de referência: um modelo só
+vale a pena se errar menos que elas nas mesmas partidas.
+"""
 
 import pandas as pd
 
-from src.data.dataset_final import preparar_dataset_final
-from src.preprocessing.feature_historico import JANELA_LONGA, MIN_PARTIDAS, ordenar_por_tempo
+from src.data.colunas import CONTEXT_COLUMNS, DATE_COLUMN, KEY_COLUMNS, PLAYER_COLUMN, TARGET_COLUMN
+from src.data.dataset_final import carregar_dados_brutos, preparar_dataset_final
+from src.evaluation.metricas import calcular_metricas
+from src.evaluation.resultados import formatar_tabela, salvar_tabela
+from src.preprocessing.feature_historico import (
+    JANELA_LONGA,
+    MIN_PARTIDAS,
+    agregar_partidas_anteriores,
+    ordenar_por_tempo,
+)
 from src.preprocessing.separacao_dados import dividir_por_tempo
 
+ARQUIVO_METRICAS = "baseline_kills.csv"
 
+# {nome da regra: (operação, janela)}. Cada regra resume as kills das partidas
+# anteriores do jogador; janela=None usa todo o histórico.
 REGRAS = {
     "media": ("mean", None),
     "media_20": ("mean", JANELA_LONGA),
@@ -17,33 +30,27 @@ REGRAS = {
 }
 
 
-def prever_baselines(df):
-    """Retorna previsões baseadas apenas nas partidas anteriores de cada jogador."""
-    obrigatorias = {"idPlayer", "idLobbyGame", "dtCreatedAt", "qtKill"}
-    ausentes = obrigatorias - set(df.columns)
+def prever_baselines(df: pd.DataFrame) -> pd.DataFrame:
+    """Retorna previsões baseadas apenas nas partidas anteriores de cada jogador.
+
+    Adiciona `qtdAnteriores` e uma coluna `previsao_<regra>` para cada regra de REGRAS.
+    """
+    ausentes = {*CONTEXT_COLUMNS, TARGET_COLUMN} - set(df.columns)
     if ausentes:
         raise ValueError(f"Colunas obrigatórias ausentes: {', '.join(sorted(ausentes))}")
 
     partidas = ordenar_por_tempo(df)
-    partidas["qtdAnteriores"] = partidas.groupby("idPlayer").cumcount()
-    kills_anteriores = partidas.groupby("idPlayer")["qtKill"].transform(
-        lambda s: s.shift(1)
-    )
-
+    partidas["qtdAnteriores"] = partidas.groupby(PLAYER_COLUMN).cumcount()
     for nome, (operacao, janela) in REGRAS.items():
-        partidas[f"previsao_{nome}"] = kills_anteriores.groupby(
-            partidas["idPlayer"]
-        ).transform(
-            lambda s: getattr(
-                s.expanding() if janela is None else s.rolling(janela, min_periods=1),
-                operacao,
-            )()
+        partidas[f"previsao_{nome}"] = agregar_partidas_anteriores(
+            partidas, TARGET_COLUMN, operacao, janela
         )
-
     return partidas
 
 
-def avaliar_baselines(previsoes, dataset_final, minimo_partidas=MIN_PARTIDAS):
+def avaliar_baselines(
+    previsoes: pd.DataFrame, dataset_final: pd.DataFrame, minimo_partidas: int = MIN_PARTIDAS
+) -> pd.DataFrame:
     """Avalia as regras nas mesmas partidas de validação do dataset final."""
     colunas = [f"previsao_{nome}" for nome in REGRAS]
     _, validacao, _ = dividir_por_tempo(dataset_final)
@@ -52,46 +59,42 @@ def avaliar_baselines(previsoes, dataset_final, minimo_partidas=MIN_PARTIDAS):
     if (validacao["qtdAnteriores"] < minimo_partidas).any():
         raise ValueError("A validação contém jogadores sem histórico suficiente.")
 
-    chaves = ["idPlayer", "idLobbyGame"]
-    origem = previsoes[chaves + ["dtCreatedAt", "qtKill", *colunas]].rename(
-        columns={"dtCreatedAt": "data_origem", "qtKill": "kills_origem"}
+    # Associa cada partida da validação à sua previsão, pela chave jogador + partida.
+    chaves = list(KEY_COLUMNS)
+    origem = previsoes[[*chaves, DATE_COLUMN, TARGET_COLUMN, *colunas]].rename(
+        columns={DATE_COLUMN: "data_origem", TARGET_COLUMN: "kills_origem"}
     )
-    avaliadas = validacao[chaves + ["dtCreatedAt", "qtKill"]].merge(
+    avaliadas = validacao[[*chaves, DATE_COLUMN, TARGET_COLUMN]].merge(
         origem, on=chaves, how="left", validate="one_to_one", indicator=True
     )
     if (avaliadas["_merge"] != "both").any() or avaliadas[colunas].isna().any().any():
         raise ValueError("Faltam previsões para partidas do conjunto de validação.")
     if not (
-        avaliadas["dtCreatedAt"].eq(avaliadas["data_origem"]).all()
-        and avaliadas["qtKill"].eq(avaliadas["kills_origem"]).all()
+        avaliadas[DATE_COLUMN].eq(avaliadas["data_origem"]).all()
+        and avaliadas[TARGET_COLUMN].eq(avaliadas["kills_origem"]).all()
     ):
         raise ValueError("O dataset final e as previsões têm partidas divergentes.")
 
-    resultados = []
-    for nome in REGRAS:
-        erros = avaliadas["qtKill"] - avaliadas[f"previsao_{nome}"]
-        resultados.append({
+    kills = avaliadas[TARGET_COLUMN].to_numpy(dtype=float)
+    return pd.DataFrame([
+        {
             "conjunto": "validacao",
             "regra": nome,
             "partidas": len(avaliadas),
             "minimo_partidas_anteriores": minimo_partidas,
-            "MAE": erros.abs().mean(),
-            "RMSE": (erros.pow(2).mean()) ** 0.5,
-        })
-    return pd.DataFrame(resultados)
+            **calcular_metricas(kills, avaliadas[f"previsao_{nome}"].to_numpy(dtype=float)),
+        }
+        for nome in REGRAS
+    ])
 
 
-def main():
-    raiz = Path(__file__).resolve().parents[2]
-    entrada = raiz / "data/raw/tb_lobby_stats_player.csv"
-    saida = raiz / "results/metrics/baseline_kills.csv"
-    dados = pd.read_csv(entrada)
+def main() -> None:
+    dados = carregar_dados_brutos()
     dataset_final = preparar_dataset_final(dados)
     metricas = avaliar_baselines(prever_baselines(dados), dataset_final)
-    saida.parent.mkdir(parents=True, exist_ok=True)
-    metricas.to_csv(saida, index=False, float_format="%.6f")
-    print(metricas.to_string(index=False, float_format=lambda valor: f"{valor:.3f}"))
-    print(f"Resultados salvos em {saida}")
+    caminho = salvar_tabela(metricas, ARQUIVO_METRICAS)
+    print(formatar_tabela(metricas))
+    print(f"Resultados salvos em {caminho}")
 
 
 if __name__ == "__main__":

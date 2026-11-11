@@ -48,3 +48,11 @@ def test_mesma_data_fica_no_mesmo_conjunto():
 def test_proporcoes_invalidas():
     with pytest.raises(ValueError):
         dividir_por_tempo(_dados(), 0.8, 0.3)
+
+
+def test_verificacao_falha_quando_os_conjuntos_se_sobrepoem():
+    treino, validacao, teste = dividir_por_tempo(_dados())
+    with pytest.raises(ValueError, match="Treino invade"):
+        verificar_ordem_temporal(validacao, treino, teste)
+    with pytest.raises(ValueError, match="Validação invade"):
+        verificar_ordem_temporal(treino, teste, validacao)

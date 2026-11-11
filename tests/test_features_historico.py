@@ -2,8 +2,12 @@ import numpy as np
 import pandas as pd
 
 from src.preprocessing.feature_historico import (
+    FEATURE_COLUMNS,
+    REQUIRED_FEATURE_COLUMNS,
+    agregar_partidas_anteriores,
     criar_features_historico,
     filtrar_minimo_partidas,
+    ordenar_por_tempo,
 )
 
 
@@ -89,3 +93,31 @@ def test_filtro_do_minimo_de_partidas():
     })
     df = filtrar_minimo_partidas(criar_features_historico(dados))
     assert list(df['qtdAnteriores']) == [5, 6]
+
+
+def test_colunas_obrigatorias_e_features_seguem_as_definicoes():
+    assert REQUIRED_FEATURE_COLUMNS == (
+        'idPlayer', 'idLobbyGame', 'dtCreatedAt', 'qtKill', 'vlDamage',
+        'qtHitHeadshot', 'qtRoundsPlayed', 'flWinner', 'qtShots', 'vlLevel',
+    )
+    assert len(FEATURE_COLUMNS) == len(set(FEATURE_COLUMNS)) == 25
+    df = criar_features_historico(_dados())
+    assert set(FEATURE_COLUMNS) <= set(df.columns)
+
+
+def test_agregacao_respeita_janela_e_minimo_de_partidas():
+    dados = pd.DataFrame({
+        'idLobbyGame': range(1, 6),
+        'idPlayer': [1] * 5,
+        'dtCreatedAt': pd.date_range('2020-01-01', periods=5),
+        'qtKill': [10, 20, 30, 40, 50],
+    })
+    df = ordenar_por_tempo(dados)
+    maximo = agregar_partidas_anteriores(df, 'qtKill', 'max')
+    soma_2 = agregar_partidas_anteriores(df, 'qtKill', 'sum', janela=2)
+    media_3 = agregar_partidas_anteriores(df, 'qtKill', 'mean', min_periods=3)
+    assert pd.isna(maximo[0])
+    assert maximo[1:].tolist() == [10, 20, 30, 40]
+    assert soma_2[1:].tolist() == [10, 30, 50, 70]
+    assert media_3[:3].isna().all()
+    assert media_3[3:].tolist() == [20, 25]
