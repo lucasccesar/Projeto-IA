@@ -1,5 +1,5 @@
-conjunto,regra,partidas,minimo_partidas_anteriores,MAE,RMSE
-validacao,media,25916,5,5.410861,6.974430
-validacao,media_20,25916,5,5.464426,7.040375
-validacao,minimo,25916,5,15.513544,17.332891
-validacao,maximo,25916,5,21.096658,23.284628
+conjunto,regra,partidas,minimo_partidas_anteriores,MAE,RMSE,R2
+validacao,media,25916,5,5.410861,6.974430,0.146838
+validacao,media_20,25916,5,5.464426,7.040375,0.130628
+validacao,minimo,25916,5,15.513544,17.332891,-4.269338
+validacao,maximo,25916,5,21.096658,23.284628,-8.509390

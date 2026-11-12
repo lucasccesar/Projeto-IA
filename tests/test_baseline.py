@@ -67,6 +67,12 @@ def test_metricas_comparam_as_quatro_regras_nas_mesmas_linhas():
     assert metricas["partidas"].tolist() == [2] * 4
     np.testing.assert_allclose(metricas["MAE"], [8.25, 8.25, 15.5, 1])
     np.testing.assert_allclose(metricas["RMSE"], [np.sqrt((8**2 + 8.5**2) / 2)] * 2 + [np.sqrt((15**2 + 16**2) / 2), 1])
+    np.testing.assert_allclose(metricas["R2"], [
+        1 - (8**2 + 8.5**2) / 0.5,
+        1 - (8**2 + 8.5**2) / 0.5,
+        1 - (15**2 + 16**2) / 0.5,
+        1 - (1**2 + 1**2) / 0.5,
+    ])
 
 
 def test_avaliacao_respeita_linhas_excluidas_do_dataset_final():
