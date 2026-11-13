@@ -3,6 +3,7 @@
 from pathlib import Path
 
 import pandas as pd
+from sklearn.metrics import r2_score
 
 from src.data.dataset_final import preparar_dataset_final
 from src.preprocessing.feature_historico import JANELA_LONGA, MIN_PARTIDAS, ordenar_por_tempo
@@ -69,7 +70,8 @@ def avaliar_baselines(previsoes, dataset_final, minimo_partidas=MIN_PARTIDAS):
 
     resultados = []
     for nome in REGRAS:
-        erros = avaliadas["qtKill"] - avaliadas[f"previsao_{nome}"]
+        previsao = avaliadas[f"previsao_{nome}"]
+        erros = avaliadas["qtKill"] - previsao
         resultados.append({
             "conjunto": "validacao",
             "regra": nome,
@@ -77,6 +79,7 @@ def avaliar_baselines(previsoes, dataset_final, minimo_partidas=MIN_PARTIDAS):
             "minimo_partidas_anteriores": minimo_partidas,
             "MAE": erros.abs().mean(),
             "RMSE": (erros.pow(2).mean()) ** 0.5,
+            "R2": r2_score(avaliadas["qtKill"], previsao),
         })
     return pd.DataFrame(resultados)
 
