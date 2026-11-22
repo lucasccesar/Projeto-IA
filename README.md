@@ -14,7 +14,7 @@ Template educacional para o desenvolvimento de um projeto acadêmico de Machine 
 
 ## Descrição geral
 
-A idéia do projeto é utilizar dados de partidas de CS da plataforma Gamers Club para analisar o desempenho dos jogadores e desenvolver uma solução de Machine Learning voltada à previsão da quantidade de kills realizadas em uma partida. O problema será abordado como uma tarefa de regressão, utilizando a variável qtKill como variável alvo.
+A ideia do projeto é utilizar dados de partidas de CS da plataforma Gamers Club para analisar o desempenho dos jogadores e desenvolver uma solução de Machine Learning voltada à previsão da quantidade de kills realizadas em uma partida. O problema será abordado como uma tarefa de regressão, utilizando a variável qtKill como variável alvo.
 
 ## Definição da baseline
 
@@ -107,6 +107,7 @@ O fluxo dos dados é sempre o mesmo: CSV original → limpeza (`data_cleaning`) 
 │   ├── figures/                  # figuras geradas pelos experimentos
 │   └── metrics/                  # CSVs de métricas gerados pelos experimentos
 ├── .gitignore
+├── pyproject.toml                # configuração do pytest
 ├── README.md
 └── requirements.txt
 ```
@@ -128,6 +129,14 @@ O fluxo dos dados é sempre o mesmo: CSV original → limpeza (`data_cleaning`) 
 - `.github/`: modelos para Issues e Pull Requests.
 
 Os notebooks devem apoiar a exploração e a comunicação dos experimentos. Coloque código reutilizável em `src/` para evitar concentrar toda a implementação nos notebooks.
+
+### Padrões do código
+
+- **Modelos (`src/models/`):** cada módulo começa com as constantes (`MODELO`, nomes dos arquivos de saída em `ARQUIVO_*` e hiperparâmetros testados), define `criar_modelo`, faz a busca de hiperparâmetros só na validação e termina com `main()`, executado por `python -m src.models.<nome>`.
+- **Resultados:** o resumo de validação de cada modelo tem as colunas `conjunto`, `modelo`, os hiperparâmetros escolhidos, `partidas`, `MAE`, `RMSE` e `R2`. As métricas são sempre calculadas por `calcular_metricas` e as tabelas gravadas por `salvar_tabela`, com seis casas decimais.
+- **Colunas e caminhos:** nomes de colunas compartilhados ficam em `src/data/colunas.py` e caminhos de pastas e arquivos em `src/utils/caminhos.py`; não repita esses valores nos módulos.
+- **Estilo:** aspas duplas, linhas de até 100 caracteres, type hints nas funções públicas e docstrings em português.
+- **Testes:** os testes de um módulo ficam em `tests/test_<modulo>.py`, com o mesmo nome do módulo testado.
 
 ## Configuração do ambiente
 
