@@ -20,14 +20,14 @@ A idéia do projeto é utilizar dados de partidas de CS da plataforma Gamers Clu
 
 A baseline prevê as kills (`qtKill`) de uma partida usando **somente as partidas anteriores do mesmo jogador**. Foram comparadas quatro regras: média de todo o histórico anterior, média das últimas 20 partidas anteriores (`media_20`), mínimo e máximo de todo o histórico anterior. A regra `media_20` usa as partidas disponíveis quando o jogador ainda não tem 20. Os registros são ordenados por jogador, data e ID do lobby; a partida prevista fica fora do cálculo. As previsões são calculadas na ordem cronológica, como se cada partida fosse prevista depois de conhecidos os resultados das partidas anteriores, inclusive as anteriores no período de validação. O dataset final determina a divisão por data (70% treino, 15% validação e 15% teste), e as previsões são associadas às suas linhas por jogador e lobby. **As métricas abaixo usam exatamente as linhas de validação do dataset final**. Partidas do teste não entram nas métricas nem no histórico das partidas de validação.
 
-| Regra | Partidas avaliadas | MAE | RMSE |
-| --- | ---: | ---: | ---: |
-| Média histórica | 25.916 | 5,411 | 6,974 |
-| Média das últimas 20 partidas | 25.916 | 5,464 | 7,040 |
-| Mínimo histórico | 25.916 | 15,514 | 17,333 |
-| Máximo histórico | 25.916 | 21,097 | 23,285 |
+| Regra | Partidas avaliadas | MAE | RMSE | R² |
+| --- | ---: | ---: | ---: | ---: |
+| Média histórica | 25.916 | 5,411 | 6,974 | 0,147 |
+| Média das últimas 20 partidas | 25.916 | 5,464 | 7,040 | 0,131 |
+| Mínimo histórico | 25.916 | 15,514 | 17,333 | -4,269 |
+| Máximo histórico | 25.916 | 21,097 | 23,285 | -8,509 |
 
-A **média histórica** é a baseline principal porque teve os menores erros nas duas métricas. A média das últimas 20 partidas também é registrada para comparação com a referência descrita no [documento de modelos](https://github.com/lucasccesar/Projeto-IA/pull/24). MAE é a média do erro absoluto em kills; RMSE também mede o erro em kills, dando mais peso a erros grandes. Os resultados completos estão em [`results/metrics/baseline_kills.csv`](results/metrics/baseline_kills.csv). Para reproduzi-los, coloque `tb_lobby_stats_player.csv` em `data/raw/` e execute na raiz do projeto:
+A **média histórica** é a baseline principal porque teve os menores erros e o maior R². A média das últimas 20 partidas também é registrada para comparação com a referência descrita no [documento de modelos](https://github.com/lucasccesar/Projeto-IA/pull/24). MAE é a média do erro absoluto em kills; RMSE também mede o erro em kills, dando mais peso a erros grandes. R² mede o desempenho em relação à previsão da média das kills na validação; valores negativos indicam desempenho pior que essa referência. Os resultados completos estão em [`results/metrics/baseline_kills.csv`](results/metrics/baseline_kills.csv). Para reproduzi-los, coloque `tb_lobby_stats_player.csv` em `data/raw/` e execute na raiz do projeto:
 
 ```bash
 python -m src.models.baseline
