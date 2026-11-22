@@ -1,12 +1,15 @@
 import numpy as np
 import pandas as pd
+import pytest
 
 from src.data.dataset_final import FEATURE_COLUMNS, TARGET_COLUMN
 from src.models.hist_gradient_boosting import (
     LOSSES,
+    avaliar_no_teste,
     buscar_hiperparametros,
     calcular_metricas,
     combinacoes,
+    configuracao_selecionada,
     criar_modelo,
     melhor_configuracao,
     resumo_validacao,
@@ -74,6 +77,31 @@ def test_selecao_pelo_menor_mae_de_validacao():
 
     mae_media = (validacao[TARGET_COLUMN] - treino[TARGET_COLUMN].mean()).abs().mean()
     assert selecionada["MAE"] < mae_media
+
+
+def test_avaliacao_no_teste_usa_a_configuracao_selecionada_e_a_baseline():
+    treino, validacao, teste = _conjunto(500, 0), _conjunto(200, 1), _conjunto(150, 2)
+    resumo = resumo_validacao(buscar_hiperparametros(treino, validacao, GRADE))
+    configuracao, mae_validacao = configuracao_selecionada(resumo)
+    assert configuracao == melhor_configuracao(buscar_hiperparametros(treino, validacao, GRADE))
+
+    resultado = avaliar_no_teste(treino, validacao, teste, configuracao, mae_validacao)
+    assert list(resultado["modelo"]) == ["baseline (média histórica)", f"hist_gradient_boosting_{configuracao['loss']}"]
+    assert (resultado["conjunto"] == "teste").all()
+    assert (resultado["partidas_teste"] == 150).all()
+    assert (resultado["partidas_treino"] == 500).all()
+    baseline, modelo = resultado.iloc[0], resultado.iloc[1]
+    assert np.isclose(baseline["MAE_teste"], (teste[TARGET_COLUMN] - teste["mediaKills_hist"]).abs().mean())
+    assert baseline["diferenca_para_baseline"] == 0
+    assert np.isclose(modelo["MAE_validacao"], mae_validacao)
+    assert modelo["max_iter"] == configuracao["max_iter"]
+
+
+def test_configuracao_selecionada_exige_uma_unica_linha():
+    resumo = resumo_validacao(buscar_hiperparametros(_conjunto(300, 0), _conjunto(100, 1), GRADE))
+    resumo["selecionado"] = True
+    with pytest.raises(ValueError):
+        configuracao_selecionada(resumo)
 
 
 def test_melhor_configuracao_por_loss():

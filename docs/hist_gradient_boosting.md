@@ -11,7 +11,7 @@ Foi implementado um `HistGradientBoostingRegressor` (scikit-learn) para prever `
 - **Dados:** dataset final (`data/processed/tb_lobby_stats_player_final.csv`, 172.773 linhas), dividido com `dividir_por_tempo`:
   - treino: 120.941 linhas;
   - validação: 25.916 linhas (as mesmas partidas usadas pela baseline, Regressão Linear, Árvore de Decisão e KNN).
-- **Conjunto de teste:** não foi usado em nenhuma etapa (treino, ajuste de hiperparâmetros ou seleção), e nenhuma métrica de teste foi calculada. Ele fica reservado para a avaliação final, depois que todos os modelos forem comparados.
+- **Conjunto de teste:** não foi usado em nenhuma etapa de treino, ajuste de hiperparâmetros ou seleção. Depois de a configuração ser escolhida na validação, ela foi avaliada uma única vez no teste (seção 4), seguindo o mesmo protocolo do KNN.
 
 ### Como reproduzir
 
@@ -28,6 +28,12 @@ python -m src.models.hist_gradient_boosting
   - `hist_gradient_boosting_busca.csv`: todas as configurações avaliadas, com parâmetros, quantidade de partidas de treino e validação, MAE no treino e MAE, RMSE e R² na validação;
   - `hist_gradient_boosting_kills.csv`: a melhor configuração de cada loss; a coluna `selecionado` marca a configuração escolhida.
 - A comparação com os outros modelos está em `results/metrics/visualizacao_metricas.ipynb`.
+
+A avaliação no teste é um comando separado, executado depois da busca. Ele não refaz a busca: lê a configuração marcada em `hist_gradient_boosting_kills.csv`, treina o modelo só no treino e grava `results/metrics/hist_gradient_boosting_teste.csv` (modelo escolhido e baseline nas mesmas partidas de teste):
+
+```bash
+python -m src.models.hist_gradient_boosting --teste
+```
 
 ### Early stopping desligado
 
@@ -84,15 +90,30 @@ MAE médio na validação de cada valor, considerando todas as combinações dos
 
 Na validação, o MAE variou entre 5,358 e 5,374 com `absolute_error` e entre 5,360 e 5,394 com `squared_error`. A tabela completa está em `results/metrics/hist_gradient_boosting_busca.csv`.
 
-## 4. Análise
+## 4. Avaliação no conjunto de teste
+
+A configuração selecionada na validação (`absolute_error`, `learning_rate=0.05`, `max_iter=300`, `max_leaf_nodes=15`, `min_samples_leaf=200`, `l2_regularization=0`) foi treinada só no treino (120.941 partidas) e avaliada uma única vez nas 25.916 partidas de teste. Nenhuma decisão foi tomada a partir destes números. O KNN aparece como referência porque também foi avaliado no mesmo teste; a baseline igual nos dois experimentos (MAE 5,412) confirma que as partidas são as mesmas.
+
+| Modelo | MAE validação | MAE teste | RMSE teste | R² teste |
+|---|---:|---:|---:|---:|
+| Baseline: média histórica de kills | 5,411 | 5,412 | 7,030 | 0,129 |
+| KNN (K=300, manhattan) | 5,377 | 5,370 | **6,974** | **0,143** |
+| **HistGradientBoosting (`absolute_error`)** | **5,358** | **5,368** | 6,992 | 0,139 |
+
+- O MAE no teste (5,368) ficou próximo do da validação (5,358), então a escolha feita na validação se manteve no teste.
+- No teste, o modelo erra 0,045 kill a menos que a baseline (0,8%). Em relação ao KNN, a diferença no MAE é de só 0,002 kill, e o KNN tem RMSE e R² um pouco melhores. Os dois modelos têm, na prática, o mesmo desempenho.
+
+Os resultados estão em `results/metrics/hist_gradient_boosting_teste.csv` e na seção de teste de `results/metrics/visualizacao_metricas.ipynb`.
+
+## 5. Análise
 
 - **O ganho é muito pequeno.** A configuração escolhida erra 0,053 kill a menos que a média histórica (cerca de 1,0%) e 0,004 kill a menos que a Regressão Linear. Essa diferença para a Regressão Linear é muito pequena para afirmar que o Gradient Boosting é melhor. O R² fica no mesmo patamar (0,156 a 0,159).
 - **Cada loss ganha na métrica que otimiza.** `absolute_error` minimiza o erro absoluto e tem o menor MAE. `squared_error` minimiza o erro quadrático e tem o menor RMSE e o maior R². Como o MAE é a métrica principal do projeto, a configuração selecionada usa `absolute_error`.
 - **Modelos mais simples se saíram melhor.** Árvores menores (15 folhas), folhas maiores (200 partidas) e menos ajuste total (`learning_rate` 0,05 ou `max_iter` 100) deram o menor MAE. As configurações mais complexas reduzem o erro no treino (até 5,03) sem melhorar a validação, o que indica um começo de overfitting. A `l2_regularization` praticamente não mudou o resultado.
 - **Interpretação:** assim como na Árvore de Decisão e na Regressão Linear, o histórico atual explica só uma parte pequena da variação das kills. O boosting não encontrou padrões não lineares relevantes além do que a Regressão Linear já captura.
 
-## 5. Próximos passos
+## 6. Próximos passos
 
 - Testar `loss="poisson"`, prevista em `docs/modelos_regressao.md`, já que `qtKill` é uma contagem.
 - Se os próximos modelos também ficarem perto de MAE 5,36, priorizar novas features em vez de modelos mais complexos.
-- A avaliação no conjunto de teste será feita só no final, com o modelo escolhido.
+- Os resultados de teste não devem ser usados para ajustar este ou outros modelos; a escolha do modelo final continua sendo feita na validação.

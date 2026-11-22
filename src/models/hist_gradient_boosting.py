@@ -136,14 +136,76 @@ def resumo_validacao(busca):
     return pd.DataFrame(linhas).sort_values("MAE", kind="stable").reset_index(drop=True)
 
 
+def configuracao_selecionada(resumo):
+    """Lê a configuração marcada como selecionada no resumo de validação."""
+    selecionadas = resumo[resumo["selecionado"].astype(bool)]
+    if len(selecionadas) != 1:
+        raise ValueError("O resumo de validação deve ter exatamente uma configuração selecionada.")
+    linha = selecionadas.iloc[0]
+    return _como_configuracao(linha), float(linha["MAE"])
+
+
+def avaliar_no_teste(treino, validacao, teste, configuracao, mae_validacao):
+    """Avaliação final da configuração já escolhida na validação.
+
+    O modelo é treinado só no treino, como na busca, e a configuração vem do
+    resumo de validação: o teste não participa de nenhuma escolha. A baseline
+    (média histórica de kills do jogador) é avaliada nas mesmas partidas.
+    """
+    X_treino, y_treino = separar_entradas_alvo(treino)
+    X_teste, y_teste = separar_entradas_alvo(teste)
+    modelo = criar_modelo(**configuracao).fit(X_treino, y_treino)
+    m_modelo = calcular_metricas(y_teste, modelo.predict(X_teste))
+    m_baseline = calcular_metricas(y_teste, teste["mediaKills_hist"])
+    mae_baseline_val = mean_absolute_error(validacao[TARGET_COLUMN], validacao["mediaKills_hist"])
+
+    linhas = [
+        {"modelo": "baseline (média histórica)", **{nome: "" for nome in PARAMETROS},
+         "MAE_validacao": mae_baseline_val, **m_baseline},
+        {"modelo": f"hist_gradient_boosting_{configuracao['loss']}", **configuracao,
+         "MAE_validacao": mae_validacao, **m_modelo},
+    ]
+    resultado = pd.DataFrame(linhas).rename(
+        columns={"MAE": "MAE_teste", "RMSE": "RMSE_teste", "R2": "R2_teste"}
+    )
+    resultado.insert(1, "conjunto", "teste")
+    resultado.insert(len(PARAMETROS) + 2, "partidas_treino", len(treino))
+    resultado.insert(len(PARAMETROS) + 3, "partidas_teste", len(teste))
+    resultado["diferenca_para_baseline"] = resultado["MAE_teste"] - m_baseline["MAE"]
+    return resultado
+
+
+def main_teste(pasta, treino, validacao, teste):
+    """Avalia no teste a configuração salva em hist_gradient_boosting_kills.csv."""
+    configuracao, mae_validacao = configuracao_selecionada(
+        pd.read_csv(pasta / "hist_gradient_boosting_kills.csv")
+    )
+    resultado = avaliar_no_teste(treino, validacao, teste, configuracao, mae_validacao)
+    resultado.to_csv(pasta / "hist_gradient_boosting_teste.csv", index=False, float_format="%.6f")
+    print(resultado.to_string(index=False, float_format=lambda v: f"{v:.3f}"))
+    print(f"Resultados salvos em {pasta}")
+
+
 def main():
+    import argparse
+
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument(
+        "--teste", action="store_true",
+        help="avalia no teste a configuração já selecionada na validação (não refaz a busca)",
+    )
+    args = parser.parse_args()
+
     raiz = Path(__file__).resolve().parents[2]
     pasta = raiz / "results/metrics"
     pasta.mkdir(parents=True, exist_ok=True)
 
     # Lê data/processed/tb_lobby_stats_player_final.csv (gerado por python -m src.data.dataset_final)
     dataset_final = carregar_dataset_final()
-    treino, validacao, _ = dividir_por_tempo(dataset_final)
+    treino, validacao, teste = dividir_por_tempo(dataset_final)
+    if args.teste:
+        main_teste(pasta, treino, validacao, teste)
+        return
 
     busca = buscar_hiperparametros(treino, validacao)
     resumo = resumo_validacao(busca)
