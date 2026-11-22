@@ -122,7 +122,7 @@ Para que os experimentos sejam comparáveis entre si, todos devem seguir o mesmo
 - [ ] Implementar e avaliar Ridge
 - [ ] Implementar e avaliar Regressão de Poisson
 - [ ] Implementar e avaliar Random Forest
-- [ ] Implementar e avaliar `HistGradientBoostingRegressor` (perdas `squared_error` e `poisson`)
+- [x] Implementar e avaliar `HistGradientBoostingRegressor`: Issue #34, com as perdas `squared_error` e `absolute_error` (ver `docs/hist_gradient_boosting.md`); `poisson` ainda não foi testada
 - [ ] Comparar resultados na validação, escolher o modelo final e avaliá-lo no teste
 
 ## Referências
