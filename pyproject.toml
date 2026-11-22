@@ -1,0 +1,6 @@
+# Configuração das ferramentas do projeto. As dependências ficam em requirements.txt.
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+# Permite importar `src` nos testes mesmo quando o pytest é chamado de outra pasta.
+pythonpath = ["."]
