@@ -18,7 +18,7 @@ from src.preprocessing.feature_historico import (
 )
 from src.preprocessing.separacao_dados import dividir_por_tempo
 
-ARQUIVO_METRICAS = "baseline_kills.csv"
+ARQUIVO_RESUMO = "baseline_kills.csv"
 
 # {nome da regra: (operação, janela)}. Cada regra resume as kills das partidas
 # anteriores do jogador; janela=None usa todo o histórico.
@@ -92,7 +92,7 @@ def main() -> None:
     dados = carregar_dados_brutos()
     dataset_final = preparar_dataset_final(dados)
     metricas = avaliar_baselines(prever_baselines(dados), dataset_final)
-    caminho = salvar_tabela(metricas, ARQUIVO_METRICAS)
+    caminho = salvar_tabela(metricas, ARQUIVO_RESUMO)
     print(formatar_tabela(metricas))
     print(f"Resultados salvos em {caminho}")
 

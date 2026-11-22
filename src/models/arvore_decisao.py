@@ -1,6 +1,7 @@
 """Árvore de Decisão para prever kills a partir do histórico do jogador."""
 
 from itertools import product
+from pathlib import Path
 
 import pandas as pd
 from matplotlib.figure import Figure
@@ -14,6 +15,11 @@ from src.utils.caminhos import PASTA_FIGURAS, PASTA_METRICAS
 
 SEMENTE = 42
 MODELO = "arvore_decisao"
+
+ARQUIVO_BUSCA = "arvore_decisao_busca.csv"
+ARQUIVO_RESUMO = "arvore_decisao_kills.csv"
+ARQUIVO_IMPORTANCIAS = "arvore_decisao_importancias.csv"
+ARQUIVO_FIGURA = "arvore_decisao_overfitting.png"
 
 # Texto usado nas tabelas para max_depth=None (árvore sem limite de profundidade).
 SEM_LIMITE = "None"
@@ -34,6 +40,7 @@ def criar_modelo(max_depth: int | None = None, min_samples_leaf: int = 1) -> Dec
 
 
 def _rotulo_profundidade(max_depth: int | None) -> int | str:
+    """Valor de max_depth como aparece nas tabelas (SEM_LIMITE quando é None)."""
     return SEM_LIMITE if max_depth is None else max_depth
 
 
@@ -75,7 +82,10 @@ def melhor_configuracao(busca: pd.DataFrame) -> dict:
 def avaliar_melhor_modelo(
     treino: pd.DataFrame, validacao: pd.DataFrame, configuracao: dict
 ) -> tuple[DecisionTreeRegressor, pd.DataFrame, pd.DataFrame]:
-    """Treina a melhor configuração e retorna o modelo, as métricas na validação e a importância das features."""
+    """Treina a melhor configuração e avalia na validação.
+
+    Retorna o modelo treinado, as métricas na validação e a importância das features.
+    """
     X_treino, y_treino = separar_entradas_alvo(treino)
     X_val, y_val = separar_entradas_alvo(validacao)
     modelo = criar_modelo(**configuracao).fit(X_treino, y_treino)
@@ -96,7 +106,9 @@ def avaliar_melhor_modelo(
     return modelo, resumo, importancias
 
 
-def grafico_overfitting(busca: pd.DataFrame, caminho, folhas: tuple[int, int] = (1, 200)) -> None:
+def grafico_overfitting(
+    busca: pd.DataFrame, caminho: str | Path, folhas: tuple[int, int] = (1, 200)
+) -> None:
     """Grava o gráfico do MAE no treino e na validação conforme a profundidade.
 
     Mostra uma curva contínua e outra tracejada, uma para cada valor de
@@ -126,18 +138,18 @@ def grafico_overfitting(busca: pd.DataFrame, caminho, folhas: tuple[int, int] = 
 
 
 def main() -> None:
-    # Lê data/processed/tb_lobby_stats_player_final.csv (gerado por python -m src.data.dataset_final)
+    # Lê o dataset final, gerado por `python -m src.data.dataset_final`.
     treino, validacao, _ = dividir_por_tempo(carregar_dataset_final())
 
     busca = buscar_hiperparametros(treino, validacao)
     configuracao = melhor_configuracao(busca)
     _, resumo, importancias = avaliar_melhor_modelo(treino, validacao, configuracao)
 
-    salvar_tabela(busca, "arvore_decisao_busca.csv")
-    salvar_tabela(resumo, "arvore_decisao_kills.csv")
-    salvar_tabela(importancias, "arvore_decisao_importancias.csv")
+    salvar_tabela(busca, ARQUIVO_BUSCA)
+    salvar_tabela(resumo, ARQUIVO_RESUMO)
+    salvar_tabela(importancias, ARQUIVO_IMPORTANCIAS)
     PASTA_FIGURAS.mkdir(parents=True, exist_ok=True)
-    grafico_overfitting(busca, PASTA_FIGURAS / "arvore_decisao_overfitting.png")
+    grafico_overfitting(busca, PASTA_FIGURAS / ARQUIVO_FIGURA)
 
     print(formatar_tabela(busca.head(10)))
     print()

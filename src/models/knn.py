@@ -18,6 +18,9 @@ from src.utils.caminhos import PASTA_METRICAS
 
 MODELO = "knn"
 
+ARQUIVO_BUSCA = "knn_busca.csv"
+ARQUIVO_RESUMO = "knn_kills.csv"
+
 # Hiperparâmetros testados: quantidade de vizinhos e forma de medir a distância.
 VALORES_K = [3, 5, 7, 9, 11, 15, 20, 30, 40, 50, 100, 200, 300]
 DISTANCIAS = ["euclidean", "manhattan", "chebyshev"]
@@ -91,7 +94,10 @@ def melhor_configuracao(busca: pd.DataFrame) -> dict:
 
 
 def resumo_validacao(busca: pd.DataFrame, partidas: int) -> pd.DataFrame:
-    """Uma linha com as métricas de validação da melhor combinação, no formato dos demais modelos."""
+    """Uma linha com as métricas de validação da melhor combinação.
+
+    Segue o mesmo formato do resumo dos demais modelos.
+    """
     melhor = busca.iloc[0]
     return pd.DataFrame([{
         "conjunto": "validacao",
@@ -107,12 +113,12 @@ def resumo_validacao(busca: pd.DataFrame, partidas: int) -> pd.DataFrame:
 
 def salvar_resultados(busca: pd.DataFrame, resumo: pd.DataFrame) -> None:
     """Grava a busca completa e o resumo da melhor combinação em results/metrics/."""
-    salvar_tabela(busca, "knn_busca.csv")
-    salvar_tabela(resumo, "knn_kills.csv")
+    salvar_tabela(busca, ARQUIVO_BUSCA)
+    salvar_tabela(resumo, ARQUIVO_RESUMO)
 
 
 def main() -> None:
-    # Lê data/processed/tb_lobby_stats_player_final.csv (gerado por python -m src.data.dataset_final)
+    # Lê o dataset final, gerado por `python -m src.data.dataset_final`.
     treino, validacao, _ = dividir_por_tempo(carregar_dataset_final())
 
     busca = buscar_hiperparametros(treino, validacao)

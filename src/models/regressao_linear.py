@@ -15,6 +15,10 @@ from src.utils.caminhos import PASTA_METRICAS
 MODELO_LINEAR = "regressao_linear"
 MODELO_RIDGE = "ridge"
 
+ARQUIVO_BUSCA = "regressao_linear_busca.csv"
+ARQUIVO_RESUMO = "regressao_linear_kills.csv"
+ARQUIVO_COEFICIENTES = "regressao_linear_coeficientes.csv"
+
 # Força da regularização do Ridge. Valores maiores encolhem mais os coeficientes.
 ALFAS = [0.01, 0.1, 1, 10, 100, 1000, 10000]
 
@@ -90,7 +94,10 @@ def correlacao_com_alvo(treino: pd.DataFrame) -> pd.Series:
 
 
 def tabela_coeficientes(treino: pd.DataFrame, alfa_ridge: float) -> pd.DataFrame:
-    """Coeficientes da Regressão Linear ao lado da correlação com as kills e dos coeficientes do Ridge."""
+    """Coeficientes da Regressão Linear com a correlação de cada feature com as kills.
+
+    Também traz os coeficientes do Ridge com `alfa_ridge`, para comparar os dois modelos.
+    """
     tabela = coeficientes(treino)
     ridge = coeficientes(treino, alfa_ridge).set_index("feature")["coeficiente"]
     tabela["correlacao_com_kills"] = tabela["feature"].map(correlacao_com_alvo(treino))
@@ -99,7 +106,7 @@ def tabela_coeficientes(treino: pd.DataFrame, alfa_ridge: float) -> pd.DataFrame
 
 
 def main() -> None:
-    # Lê data/processed/tb_lobby_stats_player_final.csv (gerado por python -m src.data.dataset_final)
+    # Lê o dataset final, gerado por `python -m src.data.dataset_final`.
     treino, validacao, _ = dividir_por_tempo(carregar_dataset_final())
 
     avaliacao = avaliar_modelos(treino, validacao)
@@ -107,9 +114,9 @@ def main() -> None:
     melhor_alfa = resumo.loc[resumo["modelo"] == MODELO_RIDGE, "alfa"].iloc[0]
     coef = tabela_coeficientes(treino, melhor_alfa)
 
-    salvar_tabela(avaliacao, "regressao_linear_busca.csv")
-    salvar_tabela(resumo, "regressao_linear_kills.csv")
-    salvar_tabela(coef, "regressao_linear_coeficientes.csv")
+    salvar_tabela(avaliacao, ARQUIVO_BUSCA)
+    salvar_tabela(resumo, ARQUIVO_RESUMO)
+    salvar_tabela(coef, ARQUIVO_COEFICIENTES)
 
     print(formatar_tabela(avaliacao))
     print()
