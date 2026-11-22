@@ -23,7 +23,8 @@ def test_previsoes_usam_apenas_historico_do_mesmo_jogador():
     resultado = prever_baselines(_partidas())
     jogador = resultado.loc[resultado["idPlayer"] == 1].reset_index(drop=True)
     assert jogador["qtdAnteriores"].tolist() == list(range(6))
-    assert jogador.loc[0, ["previsao_media", "previsao_media_20", "previsao_minimo", "previsao_maximo"]].isna().all()
+    colunas = ["previsao_media", "previsao_media_20", "previsao_minimo", "previsao_maximo"]
+    assert jogador.loc[0, colunas].isna().all()
     assert jogador.loc[5, "previsao_media"] == 10
     assert jogador.loc[5, "previsao_media_20"] == 10
     assert jogador.loc[5, "previsao_minimo"] == 0
@@ -78,7 +79,12 @@ def test_metricas_comparam_as_quatro_regras_nas_mesmas_linhas():
     assert metricas["regra"].tolist() == ["media", "media_20", "minimo", "maximo"]
     assert metricas["partidas"].tolist() == [2] * 4
     np.testing.assert_allclose(metricas["MAE"], [8.25, 8.25, 15.5, 1])
-    np.testing.assert_allclose(metricas["RMSE"], [np.sqrt((8**2 + 8.5**2) / 2)] * 2 + [np.sqrt((15**2 + 16**2) / 2), 1])
+    np.testing.assert_allclose(metricas["RMSE"], [
+        np.sqrt((8**2 + 8.5**2) / 2),
+        np.sqrt((8**2 + 8.5**2) / 2),
+        np.sqrt((15**2 + 16**2) / 2),
+        1,
+    ])
     np.testing.assert_allclose(metricas["R2"], [
         1 - (8**2 + 8.5**2) / 0.5,
         1 - (8**2 + 8.5**2) / 0.5,

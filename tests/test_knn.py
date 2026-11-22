@@ -28,7 +28,9 @@ def test_busca_testa_todas_as_combinacoes_e_ordena_pela_validacao():
     busca = buscar_hiperparametros(_conjunto(300, 0), _conjunto(100, 1), VALORES_K, DISTANCIAS)
     assert len(busca) == 6
     assert busca["MAE_validacao"].is_monotonic_increasing
-    assert list(busca.columns) == ["k", "distancia", "MAE_validacao", "RMSE_validacao", "R2_validacao"]
+    assert list(busca.columns) == [
+        "k", "distancia", "MAE_validacao", "RMSE_validacao", "R2_validacao",
+    ]
     assert set(busca["k"]) == set(VALORES_K)
     assert set(busca["distancia"]) == set(DISTANCIAS)
 

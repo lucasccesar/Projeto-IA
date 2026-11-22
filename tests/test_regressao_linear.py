@@ -15,7 +15,8 @@ def _conjunto(n, semente, deslocamento=0.0):
     rng = np.random.default_rng(semente)
     df = pd.DataFrame(rng.normal(size=(n, len(FEATURE_COLUMNS))), columns=list(FEATURE_COLUMNS))
     df += deslocamento
-    df[TARGET_COLUMN] = 20 + 3 * df["mediaKills_hist"] - 2 * df["nivelAnterior"] + rng.normal(scale=0.1, size=n)
+    ruido = rng.normal(scale=0.1, size=n)
+    df[TARGET_COLUMN] = 20 + 3 * df["mediaKills_hist"] - 2 * df["nivelAnterior"] + ruido
     return df
 
 
@@ -49,7 +50,9 @@ def test_avalia_linear_e_cada_alfa_e_resume_os_dois_modelos():
 def test_tabela_de_coeficientes_reune_linear_correlacao_e_ridge():
     treino = _conjunto(500, 0)
     tabela = tabela_coeficientes(treino, alfa_ridge=1)
-    assert list(tabela.columns) == ["feature", "coeficiente", "correlacao_com_kills", "coeficiente_ridge"]
+    assert list(tabela.columns) == [
+        "feature", "coeficiente", "correlacao_com_kills", "coeficiente_ridge",
+    ]
     assert set(tabela["feature"]) == set(FEATURE_COLUMNS)
     principal = tabela.iloc[0]
     assert principal["feature"] == "mediaKills_hist"
