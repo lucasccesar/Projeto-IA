@@ -8,6 +8,8 @@ linhas e não remove valores extremos. A validação separa dois tipos de proble
   apenas contadas porque podem ser partidas legítimas.
 """
 
+from collections.abc import Iterable, Sequence
+
 import pandas as pd
 
 from src.data.colunas import DATE_COLUMN, KEY_COLUMNS
@@ -85,7 +87,8 @@ BLOCKING_ISSUE_LABELS = {
 }
 
 
-def _ensure_dataframe(df) -> None:
+def _ensure_dataframe(df: object) -> None:
+    """Falha com TypeError se a entrada não for um DataFrame."""
     if not isinstance(df, pd.DataFrame):
         raise TypeError("A entrada deve ser um DataFrame.")
 
@@ -126,7 +129,7 @@ def identify_missing_values(df: pd.DataFrame) -> pd.DataFrame:
 
 
 def remove_missing_model_records(
-    df: pd.DataFrame, input_columns, target_column: str
+    df: pd.DataFrame, input_columns: str | Iterable[str], target_column: str
 ) -> pd.DataFrame:
     """Remove as linhas com valor ausente em alguma entrada do modelo ou no alvo.
 
@@ -142,8 +145,11 @@ def remove_missing_model_records(
     return df.dropna(subset=selected_columns).copy(deep=True)
 
 
-def identify_duplicates(df: pd.DataFrame, subset=None) -> pd.DataFrame:
-    """Retorna todas as linhas envolvidas em duplicidade (linha inteira ou nas colunas de `subset`)."""
+def identify_duplicates(df: pd.DataFrame, subset: Sequence[str] | None = None) -> pd.DataFrame:
+    """Retorna todas as linhas envolvidas em duplicidade.
+
+    Sem `subset`, compara a linha inteira; com `subset`, só as colunas informadas.
+    """
     _ensure_dataframe(df)
     duplicate_mask = df.duplicated(subset=subset, keep=False)
     return df.loc[duplicate_mask].copy(deep=True)
@@ -173,7 +179,7 @@ def convert_data_types(df: pd.DataFrame) -> pd.DataFrame:
     return converted
 
 
-def convert_dates(df: pd.DataFrame, columns=DATE_COLUMNS) -> pd.DataFrame:
+def convert_dates(df: pd.DataFrame, columns: Sequence[str] = DATE_COLUMNS) -> pd.DataFrame:
     """Converte as colunas de data para datetime e falha se houver data inválida."""
     _ensure_dataframe(df)
     converted = df.copy(deep=True)

@@ -10,7 +10,9 @@ CASAS_ARQUIVO = 6
 CASAS_TELA = 3
 
 
-def salvar_tabela(tabela: pd.DataFrame, nome_arquivo: str, pasta=PASTA_METRICAS) -> Path:
+def salvar_tabela(
+    tabela: pd.DataFrame, nome_arquivo: str, pasta: str | Path = PASTA_METRICAS
+) -> Path:
     """Grava a tabela como CSV em results/metrics/ e retorna o caminho do arquivo."""
     caminho = Path(pasta) / nome_arquivo
     caminho.parent.mkdir(parents=True, exist_ok=True)

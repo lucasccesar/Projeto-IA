@@ -18,7 +18,7 @@ from src.utils.caminhos import CAMINHO_DADOS_BRUTOS, CAMINHO_DATASET_FINAL
 FINAL_COLUMNS = (*CONTEXT_COLUMNS, *FEATURE_COLUMNS, TARGET_COLUMN)
 
 
-def carregar_dados_brutos(caminho=CAMINHO_DADOS_BRUTOS) -> pd.DataFrame:
+def carregar_dados_brutos(caminho: str | Path = CAMINHO_DADOS_BRUTOS) -> pd.DataFrame:
     """Lê o CSV original das partidas, sem nenhum tratamento."""
     caminho = Path(caminho)
     if not caminho.exists():
@@ -71,7 +71,7 @@ def validar_dataset_final(df: pd.DataFrame) -> None:
 
 
 def gerar_dataset_final(
-    entrada=CAMINHO_DADOS_BRUTOS, saida=CAMINHO_DATASET_FINAL
+    entrada: str | Path = CAMINHO_DADOS_BRUTOS, saida: str | Path = CAMINHO_DATASET_FINAL
 ) -> pd.DataFrame:
     """Executa a preparação novamente e grava o CSV no caminho informado."""
     final = preparar_dataset_final(carregar_dados_brutos(entrada))
@@ -81,7 +81,7 @@ def gerar_dataset_final(
     return final
 
 
-def carregar_dataset_final(caminho=None) -> pd.DataFrame:
+def carregar_dataset_final(caminho: str | Path | None = None) -> pd.DataFrame:
     """Lê o CSV final com a data convertida e valida o resultado carregado."""
     caminho = CAMINHO_DATASET_FINAL if caminho is None else Path(caminho)
     if not caminho.exists():
