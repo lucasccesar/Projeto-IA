@@ -5,7 +5,7 @@ from src.data.dataset_final import FEATURE_COLUMNS, TARGET_COLUMN
 from src.models.arvore_decisao import (
     avaliar_melhor_modelo,
     buscar_hiperparametros,
-    calcular_metricas,
+    grafico_overfitting,
     melhor_configuracao,
 )
 
@@ -18,12 +18,6 @@ def _conjunto(n, semente):
 
 
 GRADE = {"max_depth": [1, 3, None], "min_samples_leaf": [1, 20]}
-
-
-def test_metricas_em_kills():
-    m = calcular_metricas(pd.Series([10, 20]), np.array([12, 16]))
-    assert m["MAE"] == 3
-    assert np.isclose(m["RMSE"], np.sqrt((4 + 16) / 2))
 
 
 def test_busca_testa_todas_as_combinacoes_e_ordena_pela_validacao():
@@ -49,3 +43,10 @@ def test_melhor_modelo_supera_prever_a_media_e_usa_feature_relevante():
     assert resumo.loc[0, "partidas"] == 200
     assert importancias.loc[0, "feature"] == "mediaKills_hist"
     assert np.isclose(importancias["importancia"].sum(), 1)
+
+
+def test_grafico_usa_as_profundidades_da_propria_busca(tmp_path):
+    busca = buscar_hiperparametros(_conjunto(300, 0), _conjunto(100, 1), GRADE)
+    caminho = tmp_path / "overfitting.png"
+    grafico_overfitting(busca, caminho, folhas=(1, 20))
+    assert caminho.stat().st_size > 0

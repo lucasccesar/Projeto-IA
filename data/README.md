@@ -29,7 +29,17 @@ df = carregar_dataset_final()
 
 O CSV armazena a data como texto; a conversão para `datetime` acontece automaticamente nessa função de leitura.
 
-Para separar entradas e alvo no treinamento, use `list(FEATURE_COLUMNS)` do módulo `src.preprocessing.feature_historico` como seleção de colunas de `X` e `qtKill` como `y`. A divisão temporal pode ser aplicada ao CSV carregado com `dividir_por_tempo` de `src.preprocessing.separacao_dados`.
+Para dividir o dataset por data e separar entradas e alvo no treinamento:
+
+```python
+from src.data.dataset_final import carregar_dataset_final, separar_entradas_alvo
+from src.preprocessing.separacao_dados import dividir_por_tempo
+
+treino, validacao, teste = dividir_por_tempo(carregar_dataset_final())
+X_treino, y_treino = separar_entradas_alvo(treino)  # 25 features e qtKill
+```
+
+`separar_entradas_alvo` seleciona as colunas de `FEATURE_COLUMNS` como `X` e `qtKill` como `y`, deixando de fora as colunas de contexto.
 
 Com o dataset utilizado no projeto, o resultado tem **172.773 linhas e nenhum valor ausente** nas colunas finais. A preparação verifica também duplicidade por jogador e lobby, datas, valores finitos, kills negativas e o mínimo de histórico. O arquivo gerado fica apenas na máquina de quem executou o comando porque `data/processed/` é ignorada pelo Git; cada integrante pode recriá-lo a partir do CSV original.
 

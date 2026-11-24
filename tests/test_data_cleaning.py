@@ -1,7 +1,6 @@
 import pandas as pd
 import pytest
 
-from src.preprocessing import data_cleaning
 from src.preprocessing.data_cleaning import (
     apply_cleaning,
     clean_dataset,
@@ -10,6 +9,7 @@ from src.preprocessing.data_cleaning import (
     detect_inconsistencies,
     identify_duplicates,
     identify_missing_values,
+    remove_missing_model_records,
     validate_cleaned_dataset,
 )
 from src.preprocessing.feature_historico import criar_features_historico
@@ -37,7 +37,7 @@ def test_remove_missing_model_records_filters_selected_inputs_and_target():
         "target": [7.0, 8.0, pd.NA],
     })
 
-    filtered = data_cleaning.remove_missing_model_records(
+    filtered = remove_missing_model_records(
         df,
         input_columns=["history_feature", "second_feature"],
         target_column="target",
@@ -53,7 +53,7 @@ def test_remove_missing_model_records_preserves_complete_records():
         "target": [7.0, 8.0],
     })
 
-    filtered = data_cleaning.remove_missing_model_records(
+    filtered = remove_missing_model_records(
         df,
         input_columns=["history_feature"],
         target_column="target",
@@ -70,7 +70,7 @@ def test_remove_missing_model_records_uses_only_selected_columns():
         "unused_column": [pd.NA, 10.0],
     })
 
-    filtered = data_cleaning.remove_missing_model_records(
+    filtered = remove_missing_model_records(
         df,
         input_columns=["history_feature"],
         target_column="target",
@@ -87,7 +87,7 @@ def test_remove_missing_model_records_preserves_input_dataframe():
     })
     original = df.copy(deep=True)
 
-    filtered = data_cleaning.remove_missing_model_records(
+    filtered = remove_missing_model_records(
         df,
         input_columns=["history_feature"],
         target_column="target",
@@ -101,7 +101,7 @@ def test_remove_missing_model_records_reports_missing_selected_columns():
     df = pd.DataFrame({"target": [1.0]})
 
     with pytest.raises(ValueError, match="Colunas selecionadas ausentes"):
-        data_cleaning.remove_missing_model_records(
+        remove_missing_model_records(
             df,
             input_columns=["missing_feature"],
             target_column="target",

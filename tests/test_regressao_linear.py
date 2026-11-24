@@ -4,10 +4,10 @@ import pandas as pd
 from src.data.dataset_final import FEATURE_COLUMNS, TARGET_COLUMN
 from src.models.regressao_linear import (
     avaliar_modelos,
-    calcular_metricas,
     coeficientes,
     criar_modelo,
     resumo_validacao,
+    tabela_coeficientes,
 )
 
 
@@ -15,14 +15,9 @@ def _conjunto(n, semente, deslocamento=0.0):
     rng = np.random.default_rng(semente)
     df = pd.DataFrame(rng.normal(size=(n, len(FEATURE_COLUMNS))), columns=list(FEATURE_COLUMNS))
     df += deslocamento
-    df[TARGET_COLUMN] = 20 + 3 * df["mediaKills_hist"] - 2 * df["nivelAnterior"] + rng.normal(scale=0.1, size=n)
+    ruido = rng.normal(scale=0.1, size=n)
+    df[TARGET_COLUMN] = 20 + 3 * df["mediaKills_hist"] - 2 * df["nivelAnterior"] + ruido
     return df
-
-
-def test_metricas_em_kills():
-    m = calcular_metricas(pd.Series([10, 20]), np.array([12, 16]))
-    assert m["MAE"] == 3
-    assert np.isclose(m["RMSE"], np.sqrt((4 + 16) / 2))
 
 
 def test_padronizacao_usa_apenas_o_treino():
@@ -50,3 +45,16 @@ def test_avalia_linear_e_cada_alfa_e_resume_os_dois_modelos():
     assert resumo["modelo"].tolist() == ["regressao_linear", "ridge"]
     assert resumo.loc[1, "alfa"] == 1
     assert (resumo["partidas"] == 100).all()
+
+
+def test_tabela_de_coeficientes_reune_linear_correlacao_e_ridge():
+    treino = _conjunto(500, 0)
+    tabela = tabela_coeficientes(treino, alfa_ridge=1)
+    assert list(tabela.columns) == [
+        "feature", "coeficiente", "correlacao_com_kills", "coeficiente_ridge",
+    ]
+    assert set(tabela["feature"]) == set(FEATURE_COLUMNS)
+    principal = tabela.iloc[0]
+    assert principal["feature"] == "mediaKills_hist"
+    assert principal["correlacao_com_kills"] > 0.5
+    assert np.isclose(principal["coeficiente_ridge"], principal["coeficiente"], atol=0.05)

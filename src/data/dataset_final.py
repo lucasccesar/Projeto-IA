@@ -1,10 +1,11 @@
-"""Prepara e salva o dataset para treinamento a partir das partidas brutas."""
+"""Prepara, salva e carrega o dataset final de treinamento a partir das partidas brutas."""
 
 from pathlib import Path
 
 import numpy as np
 import pandas as pd
 
+from src.data.colunas import CONTEXT_COLUMNS, DATE_COLUMN, KEY_COLUMNS, TARGET_COLUMN
 from src.preprocessing.data_cleaning import clean_dataset, remove_missing_model_records
 from src.preprocessing.feature_historico import (
     FEATURE_COLUMNS,
@@ -12,14 +13,23 @@ from src.preprocessing.feature_historico import (
     criar_features_historico,
     filtrar_minimo_partidas,
 )
+from src.utils.caminhos import CAMINHO_DADOS_BRUTOS, CAMINHO_DATASET_FINAL
 
-
-CONTEXT_COLUMNS = ("idPlayer", "idLobbyGame", "dtCreatedAt")
-TARGET_COLUMN = "qtKill"
 FINAL_COLUMNS = (*CONTEXT_COLUMNS, *FEATURE_COLUMNS, TARGET_COLUMN)
 
 
-def preparar_dataset_final(df):
+def carregar_dados_brutos(caminho: str | Path = CAMINHO_DADOS_BRUTOS) -> pd.DataFrame:
+    """Lê o CSV original das partidas, sem nenhum tratamento."""
+    caminho = Path(caminho)
+    if not caminho.exists():
+        raise FileNotFoundError(
+            f"Dataset original não encontrado em {caminho}. "
+            "Coloque tb_lobby_stats_player.csv em data/raw/."
+        )
+    return pd.read_csv(caminho)
+
+
+def preparar_dataset_final(df: pd.DataFrame) -> pd.DataFrame:
     """Retorna uma linha por partida elegível, com histórico anterior e alvo atual.
 
     As colunas de contexto identificam a linha e permitem a divisão temporal;
@@ -39,7 +49,7 @@ def preparar_dataset_final(df):
     return final
 
 
-def validar_dataset_final(df):
+def validar_dataset_final(df: pd.DataFrame) -> None:
     """Verifica esquema, ausências e inconsistências que impedem o treinamento."""
     if tuple(df.columns) != FINAL_COLUMNS:
         raise ValueError("O dataset final não tem as colunas esperadas.")
@@ -47,9 +57,9 @@ def validar_dataset_final(df):
         raise ValueError("O dataset final está vazio.")
     if df.isna().any().any():
         raise ValueError("O dataset final contém valores ausentes.")
-    if df.duplicated(subset=["idPlayer", "idLobbyGame"]).any():
+    if df.duplicated(subset=list(KEY_COLUMNS)).any():
         raise ValueError("O dataset final contém partidas duplicadas para um jogador.")
-    if not pd.api.types.is_datetime64_any_dtype(df["dtCreatedAt"]):
+    if not pd.api.types.is_datetime64_any_dtype(df[DATE_COLUMN]):
         raise ValueError("A data do dataset final deve ser datetime.")
     if (df["qtdAnteriores"] < MIN_PARTIDAS).any():
         raise ValueError("O dataset final contém jogadores sem histórico suficiente.")
@@ -60,32 +70,38 @@ def validar_dataset_final(df):
         raise ValueError("O dataset final contém kills negativas.")
 
 
-def gerar_dataset_final(entrada, saida):
+def gerar_dataset_final(
+    entrada: str | Path = CAMINHO_DADOS_BRUTOS, saida: str | Path = CAMINHO_DATASET_FINAL
+) -> pd.DataFrame:
     """Executa a preparação novamente e grava o CSV no caminho informado."""
-    dados = pd.read_csv(entrada)
-    final = preparar_dataset_final(dados)
+    final = preparar_dataset_final(carregar_dados_brutos(entrada))
     saida = Path(saida)
     saida.parent.mkdir(parents=True, exist_ok=True)
     final.to_csv(saida, index=False)
     return final
 
 
-def carregar_dataset_final(caminho=None):
+def carregar_dataset_final(caminho: str | Path | None = None) -> pd.DataFrame:
     """Lê o CSV final com a data convertida e valida o resultado carregado."""
-    if caminho is None:
-        raiz = Path(__file__).resolve().parents[2]
-        caminho = raiz / "data/processed/tb_lobby_stats_player_final.csv"
-    final = pd.read_csv(caminho, parse_dates=["dtCreatedAt"])
+    caminho = CAMINHO_DATASET_FINAL if caminho is None else Path(caminho)
+    if not caminho.exists():
+        raise FileNotFoundError(
+            f"Dataset final não encontrado em {caminho}. "
+            "Gere-o com: python -m src.data.dataset_final"
+        )
+    final = pd.read_csv(caminho, parse_dates=[DATE_COLUMN])
     validar_dataset_final(final)
     return final
 
 
-def main():
-    raiz = Path(__file__).resolve().parents[2]
-    entrada = raiz / "data/raw/tb_lobby_stats_player.csv"
-    saida = raiz / "data/processed/tb_lobby_stats_player_final.csv"
-    final = gerar_dataset_final(entrada, saida)
-    print(f"Dataset salvo em {saida}")
+def separar_entradas_alvo(df: pd.DataFrame) -> tuple[pd.DataFrame, pd.Series]:
+    """Retorna as features de entrada (X) e as kills (y) de um conjunto do dataset final."""
+    return df[list(FEATURE_COLUMNS)], df[TARGET_COLUMN]
+
+
+def main() -> None:
+    final = gerar_dataset_final()
+    print(f"Dataset salvo em {CAMINHO_DATASET_FINAL}")
     print(f"Registros: {len(final)} | Colunas: {len(final.columns)}")
     print(f"Entradas: {len(FEATURE_COLUMNS)} | Alvo: {TARGET_COLUMN}")
     print(f"Valores ausentes: {int(final.isna().sum().sum())}")

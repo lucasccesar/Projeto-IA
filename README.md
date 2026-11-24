@@ -14,7 +14,7 @@ Template educacional para o desenvolvimento de um projeto acadêmico de Machine 
 
 ## Descrição geral
 
-A idéia do projeto é utilizar dados de partidas de CS da plataforma Gamers Club para analisar o desempenho dos jogadores e desenvolver uma solução de Machine Learning voltada à previsão da quantidade de kills realizadas em uma partida. O problema será abordado como uma tarefa de regressão, utilizando a variável qtKill como variável alvo.
+A ideia do projeto é utilizar dados de partidas de CS da plataforma Gamers Club para analisar o desempenho dos jogadores e desenvolver uma solução de Machine Learning voltada à previsão da quantidade de kills realizadas em uma partida. O problema será abordado como uma tarefa de regressão, utilizando a variável qtKill como variável alvo.
 
 ## Definição da baseline
 
@@ -35,46 +35,79 @@ python -m src.models.baseline
 
 O comando recria o dataset final em memória, recalcula as previsões e sobrescreve apenas o arquivo de métricas. Ele não altera o dataset original nem o CSV em `data/processed/`. Para comparar um modelo posterior com a baseline, use as mesmas linhas de validação e métricas.
 
+## Resultados na validação
+
+Todos os modelos usam as 25 features de histórico do dataset final e são comparados nas mesmas 25.916 partidas de validação, com as métricas calculadas por `src/evaluation/metricas.py`.
+
+| Modelo | MAE | RMSE | R² | Código | Documentação |
+| --- | ---: | ---: | ---: | --- | --- |
+| Regressão Linear | 5,362 | 6,925 | 0,159 | `src/models/regressao_linear.py` | [`docs/regressao_linear.md`](docs/regressao_linear.md) |
+| KNN (`K=300`, distância Manhattan) | 5,377 | 6,935 | 0,156 | `src/models/knn.py` | [`notebooks/05_knn.ipynb`](notebooks/05_knn.ipynb) |
+| Árvore de Decisão (`max_depth=6`, `min_samples_leaf=50`) | 5,393 | 6,963 | 0,150 | `src/models/arvore_decisao.py` | [`docs/arvore_decisao.md`](docs/arvore_decisao.md) |
+| Baseline: média histórica | 5,411 | 6,974 | 0,147 | `src/models/baseline.py` | seção acima |
+
+Os gráficos e a comparação completa estão em [`notebooks/06_visualizacao_metricas.ipynb`](notebooks/06_visualizacao_metricas.ipynb).
+
+## Como reproduzir
+
+Com o ambiente configurado (seção abaixo) e `tb_lobby_stats_player.csv` em `data/raw/`, execute na raiz do projeto:
+
+```bash
+python -m src.data.dataset_final        # gera data/processed/tb_lobby_stats_player_final.csv
+python -m src.models.baseline           # results/metrics/baseline_kills.csv
+python -m src.models.regressao_linear   # results/metrics/regressao_linear_*.csv
+python -m src.models.arvore_decisao     # results/metrics/arvore_decisao_*.csv e a figura de overfitting
+python -m src.models.knn                # results/metrics/knn_busca.csv e knn_kills.csv
+pytest                                  # testes automatizados
+```
+
+O fluxo dos dados é sempre o mesmo: CSV original → limpeza (`data_cleaning`) → features do histórico (`feature_historico`) → dataset final (`dataset_final`) → divisão por data (`separacao_dados`) → modelos → métricas (`evaluation`). A avaliação do KNN no conjunto de teste (`results/metrics/knn_teste.csv`) é feita em `notebooks/05_knn.ipynb`.
+
 ## Estrutura do repositório
 
 ```text
 .
-├── .github/
-│   ├── ISSUE_TEMPLATE/
-│   │   └── task.md
-│   └── pull_request_template.md
+├── .github/                      # modelos de Issue e de Pull Request
 ├── data/
-│   ├── raw/
-│   │   └── .gitkeep
-│   ├── processed/
-│   │   └── .gitkeep
+│   ├── raw/                      # CSVs originais (não versionados)
+│   ├── processed/                # dataset final gerado (não versionado)
 │   └── README.md
 ├── docs/
-│   ├── arvore_decisao.md
-│   └── modelos_regressao.md
+│   ├── modelos_regressao.md      # seleção dos modelos
+│   ├── regressao_linear.md
+│   └── arvore_decisao.md
 ├── notebooks/
-│   └── .gitkeep
+│   ├── 00_compreensao_dataset.ipynb
+│   ├── 01_eda_dataset.ipynb
+│   ├── 02_features.ipynb
+│   ├── 03_separacao_dados.ipynb
+│   ├── 04_limpeza_dados.ipynb
+│   ├── 05_knn.ipynb
+│   └── 06_visualizacao_metricas.ipynb
 ├── src/
 │   ├── data/
-│   │   └── __init__.py
+│   │   ├── colunas.py            # colunas que identificam a linha, a data e o alvo
+│   │   └── dataset_final.py      # prepara, salva e carrega o dataset final
 │   ├── preprocessing/
-│   │   └── __init__.py
+│   │   ├── data_cleaning.py      # limpeza e validação do dataset bruto
+│   │   ├── feature_historico.py  # features das partidas anteriores do jogador
+│   │   └── separacao_dados.py    # divisão por data em treino, validação e teste
 │   ├── models/
-│   │   └── __init__.py
+│   │   ├── baseline.py
+│   │   ├── regressao_linear.py
+│   │   ├── arvore_decisao.py
+│   │   └── knn.py
 │   ├── evaluation/
-│   │   └── __init__.py
-│   ├── utils/
-│   │   └── __init__.py
-│   └── __init__.py
-├── tests/
-│   ├── .gitkeep
-│   └── __init__.py
+│   │   ├── metricas.py           # MAE, RMSE e R², iguais para todos os modelos
+│   │   └── resultados.py         # gravação e exibição das tabelas de resultados
+│   └── utils/
+│       └── caminhos.py           # caminhos padrão de dados e resultados
+├── tests/                        # um arquivo de teste por módulo de src/
 ├── results/
-│   ├── figures/
-│   │   └── .gitkeep
-│   └── metrics/
-│       └── .gitkeep
+│   ├── figures/                  # figuras geradas pelos experimentos
+│   └── metrics/                  # CSVs de métricas gerados pelos experimentos
 ├── .gitignore
+├── pyproject.toml                # configuração do pytest
 ├── README.md
 └── requirements.txt
 ```
@@ -85,17 +118,25 @@ O comando recria o dataset final em memória, recalcula as previsões e sobrescr
 - `data/processed/`: dados gerados por limpeza, transformação ou preparação. Esses arquivos também não devem ser versionados por padrão.
 - `docs/`: documentos de decisões do projeto, como a seleção dos modelos de regressão.
 - `notebooks/`: análises exploratórias, experimentos e registros de investigação em Jupyter.
-- `src/data/`: código reutilizável de carregamento e manipulação inicial dos dados.
-- `src/preprocessing/`: código reutilizável de pré-processamento.
-- `src/models/`: código de modelos e treinamento a ser desenvolvido pelos alunos.
-- `src/evaluation/`: código de avaliação e métricas a ser desenvolvido pelos alunos.
-- `src/utils/`: funções auxiliares compartilhadas pelo projeto.
+- `src/data/`: carregamento dos dados e geração do dataset final de treinamento.
+- `src/preprocessing/`: limpeza, criação das features do histórico e divisão temporal.
+- `src/models/`: baseline e modelos. Cada módulo pode ser executado com `python -m src.models.<nome>`.
+- `src/evaluation/`: métricas e gravação dos resultados, compartilhadas por todos os modelos.
+- `src/utils/`: caminhos padrão e funções auxiliares compartilhadas pelo projeto.
 - `tests/`: testes automatizados do código produzido pela equipe.
-- `results/figures/`: figuras e gráficos gerados pelos experimentos.
-- `results/metrics/`: resultados de métricas gerados pelos experimentos.
+- `results/figures/`: figuras e gráficos gerados pelos experimentos (os PNG são versionados).
+- `results/metrics/`: resultados de métricas gerados pelos experimentos (os CSV são versionados).
 - `.github/`: modelos para Issues e Pull Requests.
 
 Os notebooks devem apoiar a exploração e a comunicação dos experimentos. Coloque código reutilizável em `src/` para evitar concentrar toda a implementação nos notebooks.
+
+### Padrões do código
+
+- **Modelos (`src/models/`):** cada módulo começa com as constantes (`MODELO`, nomes dos arquivos de saída em `ARQUIVO_*` e hiperparâmetros testados), define `criar_modelo`, faz a busca de hiperparâmetros só na validação e termina com `main()`, executado por `python -m src.models.<nome>`.
+- **Resultados:** o resumo de validação de cada modelo tem as colunas `conjunto`, `modelo`, os hiperparâmetros escolhidos, `partidas`, `MAE`, `RMSE` e `R2`. As métricas são sempre calculadas por `calcular_metricas` e as tabelas gravadas por `salvar_tabela`, com seis casas decimais.
+- **Colunas e caminhos:** nomes de colunas compartilhados ficam em `src/data/colunas.py` e caminhos de pastas e arquivos em `src/utils/caminhos.py`; não repita esses valores nos módulos.
+- **Estilo:** aspas duplas, linhas de até 100 caracteres, type hints nas funções públicas e docstrings em português.
+- **Testes:** os testes de um módulo ficam em `tests/test_<modulo>.py`, com o mesmo nome do módulo testado.
 
 ## Configuração do ambiente
 
@@ -138,7 +179,7 @@ Os notebooks devem apoiar a exploração e a comunicação dos experimentos. Col
 
 Armazene os datasets originais em `data/raw/` e preserve-os sem modificações. Salve em `data/processed/` apenas os dados resultantes de limpeza, transformação ou preparação.
 
-Datasets e artefatos gerados podem ser grandes ou conter informações que não devem ser publicadas. Por isso, o `.gitignore` impede o versionamento desses arquivos por padrão. Os arquivos `.gitkeep` mantêm a estrutura das pastas no Git. Se a equipe precisar compartilhar dados, deve combinar um meio apropriado e documentar como obtê-los em `data/README.md`.
+Datasets podem ser grandes ou conter informações que não devem ser publicadas. Por isso, o `.gitignore` impede o versionamento desses arquivos por padrão. Dos resultados, apenas as tabelas de métricas (CSV) e as figuras (PNG) são versionadas. Os arquivos `.gitkeep` mantêm a estrutura das pastas no Git. Se a equipe precisar compartilhar dados, deve combinar um meio apropriado e documentar como obtê-los em `data/README.md`.
 
 ## Fluxo de desenvolvimento
 
