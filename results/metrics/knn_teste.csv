@@ -1,0 +1,3 @@
+conjunto,modelo,k,distancia,partidas,MAE,RMSE,R2
+teste,baseline_media,,,25916,5.412317,7.030461,0.128914
+teste,knn,300,manhattan,25916,5.369530,6.973711,0.142920

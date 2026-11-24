@@ -6,10 +6,10 @@ from src.preprocessing.separacao_dados import dividir_por_tempo, verificar_ordem
 
 def _dados(n=100):
     return pd.DataFrame({
-        'idPlayer': [i % 5 for i in range(n)],
-        'dtCreatedAt': pd.date_range('2020-01-01', periods=n, freq='D'),
-        'qtKill': range(n),
-    }).sample(frac=1, random_state=0)   # embaralhado, para testar a ordenação
+        "idPlayer": [i % 5 for i in range(n)],
+        "dtCreatedAt": pd.date_range("2020-01-01", periods=n, freq="D"),
+        "qtKill": range(n),
+    }).sample(frac=1, random_state=0)  # embaralhado, para testar a ordenação
 
 
 def test_proporcoes_e_total():
@@ -23,8 +23,8 @@ def test_proporcoes_e_total():
 def test_ordem_temporal_sem_sobreposicao():
     treino, validacao, teste = dividir_por_tempo(_dados())
     verificar_ordem_temporal(treino, validacao, teste)
-    assert treino['dtCreatedAt'].max() < validacao['dtCreatedAt'].min()
-    assert validacao['dtCreatedAt'].max() < teste['dtCreatedAt'].min()
+    assert treino["dtCreatedAt"].max() < validacao["dtCreatedAt"].min()
+    assert validacao["dtCreatedAt"].max() < teste["dtCreatedAt"].min()
 
 
 def test_nenhuma_linha_repetida_ou_perdida():
@@ -37,14 +37,22 @@ def test_nenhuma_linha_repetida_ou_perdida():
 
 def test_mesma_data_fica_no_mesmo_conjunto():
     dados = pd.DataFrame({
-        'idPlayer': range(10),
-        'dtCreatedAt': pd.to_datetime(['2020-01-01'] * 5 + ['2020-01-02'] * 5),
+        "idPlayer": range(10),
+        "dtCreatedAt": pd.to_datetime(["2020-01-01"] * 5 + ["2020-01-02"] * 5),
     })
     treino, validacao, teste = dividir_por_tempo(dados, 0.5, 0.2)
     for conjunto in (treino, validacao, teste):
-        assert conjunto['dtCreatedAt'].nunique() <= 1
+        assert conjunto["dtCreatedAt"].nunique() <= 1
 
 
 def test_proporcoes_invalidas():
     with pytest.raises(ValueError):
         dividir_por_tempo(_dados(), 0.8, 0.3)
+
+
+def test_verificacao_falha_quando_os_conjuntos_se_sobrepoem():
+    treino, validacao, teste = dividir_por_tempo(_dados())
+    with pytest.raises(ValueError, match="Treino invade"):
+        verificar_ordem_temporal(validacao, treino, teste)
+    with pytest.raises(ValueError, match="Validação invade"):
+        verificar_ordem_temporal(treino, teste, validacao)

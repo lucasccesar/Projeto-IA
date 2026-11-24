@@ -6,9 +6,11 @@ from src.data.dataset_final import (
     FEATURE_COLUMNS,
     FINAL_COLUMNS,
     TARGET_COLUMN,
+    carregar_dados_brutos,
     carregar_dataset_final,
     gerar_dataset_final,
     preparar_dataset_final,
+    separar_entradas_alvo,
 )
 
 
@@ -86,3 +88,18 @@ def test_rejeita_inconsistencia_critica():
     dados.loc[0, "qtKill"] = -1
     with pytest.raises(ValueError, match="valores negativos"):
         preparar_dataset_final(dados)
+
+
+def test_separa_entradas_e_alvo_sem_colunas_de_contexto():
+    final = preparar_dataset_final(_partidas())
+    X, y = separar_entradas_alvo(final)
+    assert tuple(X.columns) == FEATURE_COLUMNS
+    assert y.name == TARGET_COLUMN
+    assert y.tolist() == [60, 70]
+
+
+def test_arquivo_ausente_explica_como_obter_os_dados(tmp_path):
+    with pytest.raises(FileNotFoundError, match="python -m src.data.dataset_final"):
+        carregar_dataset_final(tmp_path / "nao_existe.csv")
+    with pytest.raises(FileNotFoundError, match="data/raw"):
+        carregar_dados_brutos(tmp_path / "nao_existe.csv")
