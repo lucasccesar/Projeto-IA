@@ -25,11 +25,11 @@ python -m src.models.hist_gradient_boosting
 - Semente: `random_state=42` (constante `SEMENTE`). Duas execuções seguidas geram arquivos idênticos.
 - Tempo: cerca de 1 a 2 minutos para as 64 configurações.
 - Saídas em `results/metrics/`:
-  - `hist_gradient_boosting_busca.csv`: todas as configurações avaliadas, com parâmetros, quantidade de partidas de treino e validação, MAE no treino e MAE, RMSE e R² na validação;
-  - `hist_gradient_boosting_kills.csv`: a melhor configuração de cada loss; a coluna `selecionado` marca a configuração escolhida.
-- A comparação com os outros modelos está em `results/metrics/visualizacao_metricas.ipynb`.
+  - `hist_gradient_boosting_busca.csv`: todas as configurações avaliadas, com parâmetros, MAE no treino, MAE, RMSE e R² na validação e a diferença de MAE entre validação e treino;
+  - `hist_gradient_boosting_kills.csv`: a melhor configuração de cada loss, no formato de resumo dos demais modelos (`conjunto`, `modelo`, hiperparâmetros, `partidas`, `MAE`, `RMSE`, `R2`), ordenada pelo MAE. A primeira linha é a configuração escolhida.
+- A comparação com os outros modelos está em `notebooks/06_visualizacao_metricas.ipynb`.
 
-A avaliação no teste é um comando separado, executado depois da busca. Ele não refaz a busca: lê a configuração marcada em `hist_gradient_boosting_kills.csv`, treina o modelo só no treino e grava `results/metrics/hist_gradient_boosting_teste.csv` (modelo escolhido e baseline nas mesmas partidas de teste):
+A avaliação no teste é um comando separado, executado depois da busca. Ele não refaz a busca: lê a configuração de menor MAE em `hist_gradient_boosting_kills.csv`, treina o modelo só no treino e grava `results/metrics/hist_gradient_boosting_teste.csv` (modelo escolhido e baseline `baseline_media` nas mesmas partidas de teste, no mesmo formato de `knn_teste.csv`):
 
 ```bash
 python -m src.models.hist_gradient_boosting --teste
@@ -103,7 +103,7 @@ A configuração selecionada na validação (`absolute_error`, `learning_rate=0.
 - O MAE no teste (5,368) ficou próximo do da validação (5,358), então a escolha feita na validação se manteve no teste.
 - No teste, o modelo erra 0,045 kill a menos que a baseline (0,8%). Em relação ao KNN, a diferença no MAE é de só 0,002 kill, e o KNN tem RMSE e R² um pouco melhores. Os dois modelos têm, na prática, o mesmo desempenho.
 
-Os resultados estão em `results/metrics/hist_gradient_boosting_teste.csv` e na seção de teste de `results/metrics/visualizacao_metricas.ipynb`.
+Os resultados estão em `results/metrics/hist_gradient_boosting_teste.csv` e na seção de teste de `notebooks/06_visualizacao_metricas.ipynb`.
 
 ## 5. Análise
 

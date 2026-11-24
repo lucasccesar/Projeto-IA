@@ -58,6 +58,8 @@ python -m src.models.baseline           # results/metrics/baseline_kills.csv
 python -m src.models.regressao_linear   # results/metrics/regressao_linear_*.csv
 python -m src.models.arvore_decisao     # results/metrics/arvore_decisao_*.csv e a figura de overfitting
 python -m src.models.knn                # results/metrics/knn_busca.csv e knn_kills.csv
+python -m src.models.hist_gradient_boosting           # hist_gradient_boosting_busca.csv e _kills.csv
+python -m src.models.hist_gradient_boosting --teste   # hist_gradient_boosting_teste.csv
 pytest                                  # testes automatizados
 ```
 
