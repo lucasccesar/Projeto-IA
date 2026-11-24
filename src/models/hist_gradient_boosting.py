@@ -1,18 +1,33 @@
-"""HistGradientBoostingRegressor para prever kills a partir do histórico do jogador."""
+"""HistGradientBoostingRegressor para prever kills a partir do histórico do jogador.
 
+A busca de hiperparâmetros usa só o treino e a validação. A avaliação no teste é
+um comando separado (`--teste`), que lê a configuração já escolhida na validação.
+"""
+
+import argparse
 from itertools import product
-from pathlib import Path
 
-import numpy as np
 import pandas as pd
 from sklearn.ensemble import HistGradientBoostingRegressor
-from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
 
-from src.data.dataset_final import FEATURE_COLUMNS, TARGET_COLUMN, carregar_dataset_final
+from src.data.colunas import TARGET_COLUMN
+from src.data.dataset_final import carregar_dataset_final, separar_entradas_alvo
+from src.evaluation.metricas import calcular_metricas, metricas_treino_validacao
+from src.evaluation.resultados import formatar_tabela, salvar_tabela
 from src.preprocessing.separacao_dados import dividir_por_tempo
-
+from src.utils.caminhos import PASTA_METRICAS
 
 SEMENTE = 42
+MODELO = "hist_gradient_boosting"
+BASELINE = "baseline_media"
+
+ARQUIVO_BUSCA = "hist_gradient_boosting_busca.csv"
+ARQUIVO_RESUMO = "hist_gradient_boosting_kills.csv"
+ARQUIVO_TESTE = "hist_gradient_boosting_teste.csv"
+
+# Coluna do dataset com a média histórica de kills, usada como baseline no teste.
+COLUNA_BASELINE = "mediaKills_hist"
+
 LOSSES = ("squared_error", "absolute_error")
 
 # Hiperparâmetros testados para cada loss (32 combinações por loss).
@@ -29,16 +44,25 @@ GRADE = {
     "l2_regularization": [0.0, 1.0],
 }
 PARAMETROS = ("loss", *GRADE)
+TIPOS_PARAMETROS = {
+    "loss": str,
+    "learning_rate": float,
+    "max_iter": int,
+    "max_leaf_nodes": int,
+    "min_samples_leaf": int,
+    "l2_regularization": float,
+}
 
 
-def separar_entradas_alvo(df):
-    """Retorna as features de entrada (X) e as kills (y)."""
-    return df[list(FEATURE_COLUMNS)], df[TARGET_COLUMN]
-
-
-def criar_modelo(loss="squared_error", learning_rate=0.1, max_iter=100, max_leaf_nodes=31,
-                 min_samples_leaf=20, l2_regularization=0.0):
-    """Gradient Boosting com early stopping desligado.
+def criar_modelo(
+    loss: str = "squared_error",
+    learning_rate: float = 0.1,
+    max_iter: int = 100,
+    max_leaf_nodes: int = 31,
+    min_samples_leaf: int = 20,
+    l2_regularization: float = 0.0,
+) -> HistGradientBoostingRegressor:
+    """Gradient Boosting com semente fixa e early stopping desligado.
 
     O early stopping do scikit-learn separa uma amostra aleatória do treino, o que
     misturaria partidas de datas diferentes. Por isso o número de iterações é fixo
@@ -57,16 +81,7 @@ def criar_modelo(loss="squared_error", learning_rate=0.1, max_iter=100, max_leaf
     )
 
 
-def calcular_metricas(y_real, y_previsto):
-    """MAE, RMSE e R² em kills."""
-    return {
-        "MAE": mean_absolute_error(y_real, y_previsto),
-        "RMSE": float(np.sqrt(mean_squared_error(y_real, y_previsto))),
-        "R2": r2_score(y_real, y_previsto),
-    }
-
-
-def combinacoes(grade=None, losses=LOSSES):
+def combinacoes(grade: dict | None = None, losses: tuple[str, ...] = LOSSES) -> list[dict]:
     """Lista de configurações: todas as combinações da grade para cada loss."""
     grade = GRADE if grade is None else grade
     nomes = list(grade)
@@ -77,9 +92,15 @@ def combinacoes(grade=None, losses=LOSSES):
     ]
 
 
-def buscar_hiperparametros(treino, validacao, grade=None, losses=LOSSES):
+def buscar_hiperparametros(
+    treino: pd.DataFrame,
+    validacao: pd.DataFrame,
+    grade: dict | None = None,
+    losses: tuple[str, ...] = LOSSES,
+) -> pd.DataFrame:
     """Treina um modelo para cada configuração e avalia no treino e na validação.
 
+    Retorna uma linha por configuração, da menor para a maior MAE na validação.
     O conjunto de teste não é usado: ele fica reservado para a avaliação final do projeto.
     """
     X_treino, y_treino = separar_entradas_alvo(treino)
@@ -88,64 +109,62 @@ def buscar_hiperparametros(treino, validacao, grade=None, losses=LOSSES):
     resultados = []
     for configuracao in combinacoes(grade, losses):
         modelo = criar_modelo(**configuracao).fit(X_treino, y_treino)
-        m_treino = calcular_metricas(y_treino, modelo.predict(X_treino))
-        m_val = calcular_metricas(y_val, modelo.predict(X_val))
+        metricas = metricas_treino_validacao(modelo, X_treino, y_treino, X_val, y_val)
         resultados.append({
             **configuracao,
-            "partidas_treino": len(treino),
-            "partidas_validacao": len(validacao),
-            "MAE_treino": m_treino["MAE"],
-            "MAE_validacao": m_val["MAE"],
-            "RMSE_validacao": m_val["RMSE"],
-            "R2_validacao": m_val["R2"],
-            "diferenca_MAE": m_val["MAE"] - m_treino["MAE"],
+            **metricas,
+            # Quanto maior, mais o modelo decorou o treino (overfitting).
+            "diferenca_MAE": metricas["MAE_validacao"] - metricas["MAE_treino"],
         })
-    return pd.DataFrame(resultados).sort_values("MAE_validacao", kind="stable").reset_index(drop=True)
+    return (
+        pd.DataFrame(resultados)
+        .sort_values("MAE_validacao", kind="stable")
+        .reset_index(drop=True)
+    )
 
 
-def _como_configuracao(linha):
-    tipos = {"loss": str, "learning_rate": float, "max_iter": int, "max_leaf_nodes": int,
-             "min_samples_leaf": int, "l2_regularization": float}
-    return {nome: tipos[nome](linha[nome]) for nome in PARAMETROS}
+def _como_configuracao(linha: pd.Series) -> dict:
+    """Lê os hiperparâmetros de uma linha de tabela com os tipos que o modelo espera."""
+    return {nome: TIPOS_PARAMETROS[nome](linha[nome]) for nome in PARAMETROS}
 
 
-def melhor_configuracao(busca, loss=None):
+def melhor_configuracao(busca: pd.DataFrame, loss: str | None = None) -> dict:
     """Configuração com o menor MAE na validação (opcionalmente só de uma loss)."""
     candidatas = busca if loss is None else busca[busca["loss"] == loss]
     return _como_configuracao(candidatas.nsmallest(1, "MAE_validacao").iloc[0])
 
 
-def resumo_validacao(busca):
-    """Uma linha com a melhor configuração de cada loss; `selecionado` marca a de menor MAE."""
-    escolhida = melhor_configuracao(busca)
+def resumo_validacao(busca: pd.DataFrame, partidas: int) -> pd.DataFrame:
+    """Uma linha com a melhor configuração de cada loss, da menor para a maior MAE.
+
+    A primeira linha é a configuração escolhida para o modelo. Segue o mesmo
+    formato do resumo dos demais modelos, com a loss como hiperparâmetro.
+    """
     linhas = []
     for loss in busca["loss"].drop_duplicates():
-        linha = busca[busca["loss"] == loss].nsmallest(1, "MAE_validacao").iloc[0]
-        configuracao = _como_configuracao(linha)
+        melhor = busca[busca["loss"] == loss].nsmallest(1, "MAE_validacao").iloc[0]
         linhas.append({
             "conjunto": "validacao",
-            "modelo": f"hist_gradient_boosting_{loss}",
-            **configuracao,
-            "partidas": int(linha["partidas_validacao"]),
-            "partidas_treino": int(linha["partidas_treino"]),
-            "MAE": linha["MAE_validacao"],
-            "RMSE": linha["RMSE_validacao"],
-            "R2": linha["R2_validacao"],
-            "selecionado": configuracao == escolhida,
+            "modelo": MODELO,
+            **_como_configuracao(melhor),
+            "partidas": partidas,
+            "MAE": melhor["MAE_validacao"],
+            "RMSE": melhor["RMSE_validacao"],
+            "R2": melhor["R2_validacao"],
         })
     return pd.DataFrame(linhas).sort_values("MAE", kind="stable").reset_index(drop=True)
 
 
-def configuracao_selecionada(resumo):
-    """Lê a configuração marcada como selecionada no resumo de validação."""
-    selecionadas = resumo[resumo["selecionado"].astype(bool)]
-    if len(selecionadas) != 1:
-        raise ValueError("O resumo de validação deve ter exatamente uma configuração selecionada.")
-    linha = selecionadas.iloc[0]
-    return _como_configuracao(linha), float(linha["MAE"])
+def configuracao_selecionada(resumo: pd.DataFrame) -> dict:
+    """Configuração escolhida na validação: a de menor MAE no resumo."""
+    if resumo.empty:
+        raise ValueError("O resumo de validação está vazio.")
+    return _como_configuracao(resumo.nsmallest(1, "MAE").iloc[0])
 
 
-def avaliar_no_teste(treino, validacao, teste, configuracao, mae_validacao):
+def avaliar_no_teste(
+    treino: pd.DataFrame, teste: pd.DataFrame, configuracao: dict
+) -> pd.DataFrame:
     """Avaliação final da configuração já escolhida na validação.
 
     O modelo é treinado só no treino, como na busca, e a configuração vem do
@@ -155,69 +174,62 @@ def avaliar_no_teste(treino, validacao, teste, configuracao, mae_validacao):
     X_treino, y_treino = separar_entradas_alvo(treino)
     X_teste, y_teste = separar_entradas_alvo(teste)
     modelo = criar_modelo(**configuracao).fit(X_treino, y_treino)
-    m_modelo = calcular_metricas(y_teste, modelo.predict(X_teste))
-    m_baseline = calcular_metricas(y_teste, teste["mediaKills_hist"])
-    mae_baseline_val = mean_absolute_error(validacao[TARGET_COLUMN], validacao["mediaKills_hist"])
 
     linhas = [
-        {"modelo": "baseline (média histórica)", **{nome: "" for nome in PARAMETROS},
-         "MAE_validacao": mae_baseline_val, **m_baseline},
-        {"modelo": f"hist_gradient_boosting_{configuracao['loss']}", **configuracao,
-         "MAE_validacao": mae_validacao, **m_modelo},
+        {
+            "conjunto": "teste",
+            "modelo": BASELINE,
+            **{nome: None for nome in PARAMETROS},
+            "partidas": len(teste),
+            **calcular_metricas(teste[TARGET_COLUMN], teste[COLUNA_BASELINE]),
+        },
+        {
+            "conjunto": "teste",
+            "modelo": MODELO,
+            **configuracao,
+            "partidas": len(teste),
+            **calcular_metricas(y_teste, modelo.predict(X_teste)),
+        },
     ]
-    resultado = pd.DataFrame(linhas).rename(
-        columns={"MAE": "MAE_teste", "RMSE": "RMSE_teste", "R2": "R2_teste"}
-    )
-    resultado.insert(1, "conjunto", "teste")
-    resultado.insert(len(PARAMETROS) + 2, "partidas_treino", len(treino))
-    resultado.insert(len(PARAMETROS) + 3, "partidas_teste", len(teste))
-    resultado["diferenca_para_baseline"] = resultado["MAE_teste"] - m_baseline["MAE"]
-    return resultado
+    # A linha da baseline não tem hiperparâmetros; o tipo Int64 aceita o valor vazio
+    # sem transformar os inteiros em float (300 em vez de 300.000000 no CSV).
+    inteiros = {nome: "Int64" for nome, tipo in TIPOS_PARAMETROS.items() if tipo is int}
+    return pd.DataFrame(linhas).astype(inteiros)
 
 
-def main_teste(pasta, treino, validacao, teste):
-    """Avalia no teste a configuração salva em hist_gradient_boosting_kills.csv."""
-    configuracao, mae_validacao = configuracao_selecionada(
-        pd.read_csv(pasta / "hist_gradient_boosting_kills.csv")
-    )
-    resultado = avaliar_no_teste(treino, validacao, teste, configuracao, mae_validacao)
-    resultado.to_csv(pasta / "hist_gradient_boosting_teste.csv", index=False, float_format="%.6f")
-    print(resultado.to_string(index=False, float_format=lambda v: f"{v:.3f}"))
-    print(f"Resultados salvos em {pasta}")
+def main_teste(treino: pd.DataFrame, teste: pd.DataFrame) -> None:
+    """Avalia no teste a configuração salva no resumo de validação."""
+    configuracao = configuracao_selecionada(pd.read_csv(PASTA_METRICAS / ARQUIVO_RESUMO))
+    resultado = avaliar_no_teste(treino, teste, configuracao)
+    salvar_tabela(resultado, ARQUIVO_TESTE)
+    print(formatar_tabela(resultado))
+    print(f"Resultados salvos em {PASTA_METRICAS}")
 
 
-def main():
-    import argparse
-
+def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
-        "--teste", action="store_true",
+        "--teste",
+        action="store_true",
         help="avalia no teste a configuração já selecionada na validação (não refaz a busca)",
     )
     args = parser.parse_args()
 
-    raiz = Path(__file__).resolve().parents[2]
-    pasta = raiz / "results/metrics"
-    pasta.mkdir(parents=True, exist_ok=True)
-
-    # Lê data/processed/tb_lobby_stats_player_final.csv (gerado por python -m src.data.dataset_final)
-    dataset_final = carregar_dataset_final()
-    treino, validacao, teste = dividir_por_tempo(dataset_final)
+    # Lê o dataset final, gerado por `python -m src.data.dataset_final`.
+    treino, validacao, teste = dividir_por_tempo(carregar_dataset_final())
     if args.teste:
-        main_teste(pasta, treino, validacao, teste)
+        main_teste(treino, teste)
         return
 
     busca = buscar_hiperparametros(treino, validacao)
-    resumo = resumo_validacao(busca)
+    resumo = resumo_validacao(busca, len(validacao))
+    salvar_tabela(busca, ARQUIVO_BUSCA)
+    salvar_tabela(resumo, ARQUIVO_RESUMO)
 
-    busca.to_csv(pasta / "hist_gradient_boosting_busca.csv", index=False, float_format="%.6f")
-    resumo.to_csv(pasta / "hist_gradient_boosting_kills.csv", index=False, float_format="%.6f")
-
-    formato = lambda v: f"{v:.3f}"
-    print(busca.head(10).to_string(index=False, float_format=formato))
+    print(formatar_tabela(busca.head(10)))
     print()
-    print(resumo.to_string(index=False, float_format=formato))
-    print(f"Resultados salvos em {pasta}")
+    print(formatar_tabela(resumo))
+    print(f"Resultados salvos em {PASTA_METRICAS}")
 
 
 if __name__ == "__main__":
