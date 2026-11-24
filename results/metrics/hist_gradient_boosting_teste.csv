@@ -1,0 +1,3 @@
+conjunto,modelo,loss,learning_rate,max_iter,max_leaf_nodes,min_samples_leaf,l2_regularization,partidas,MAE,RMSE,R2
+teste,baseline_media,,,,,,,25916,5.412317,7.030461,0.128914
+teste,hist_gradient_boosting,absolute_error,0.050000,300,15,200,0.000000,25916,5.367792,6.991659,0.138503

@@ -1,0 +1,3 @@
+conjunto,modelo,loss,learning_rate,max_iter,max_leaf_nodes,min_samples_leaf,l2_regularization,partidas,MAE,RMSE,R2
+validacao,hist_gradient_boosting,absolute_error,0.050000,300,15,200,0.000000,25916,5.357853,6.936792,0.156022
+validacao,hist_gradient_boosting,squared_error,0.100000,100,15,200,0.000000,25916,5.360079,6.924010,0.159129

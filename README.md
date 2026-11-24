@@ -41,6 +41,7 @@ Todos os modelos usam as 25 features de histórico do dataset final e são compa
 
 | Modelo | MAE | RMSE | R² | Código | Documentação |
 | --- | ---: | ---: | ---: | --- | --- |
+| HistGradientBoosting (`loss="absolute_error"`, `max_leaf_nodes=15`, `min_samples_leaf=200`) | 5,358 | 6,937 | 0,156 | `src/models/hist_gradient_boosting.py` | [`docs/hist_gradient_boosting.md`](docs/hist_gradient_boosting.md) |
 | Regressão Linear | 5,362 | 6,925 | 0,159 | `src/models/regressao_linear.py` | [`docs/regressao_linear.md`](docs/regressao_linear.md) |
 | KNN (`K=300`, distância Manhattan) | 5,377 | 6,935 | 0,156 | `src/models/knn.py` | [`notebooks/05_knn.ipynb`](notebooks/05_knn.ipynb) |
 | Árvore de Decisão (`max_depth=6`, `min_samples_leaf=50`) | 5,393 | 6,963 | 0,150 | `src/models/arvore_decisao.py` | [`docs/arvore_decisao.md`](docs/arvore_decisao.md) |
@@ -53,15 +54,17 @@ Os gráficos e a comparação completa estão em [`notebooks/06_visualizacao_met
 Com o ambiente configurado (seção abaixo) e `tb_lobby_stats_player.csv` em `data/raw/`, execute na raiz do projeto:
 
 ```bash
-python -m src.data.dataset_final        # gera data/processed/tb_lobby_stats_player_final.csv
-python -m src.models.baseline           # results/metrics/baseline_kills.csv
-python -m src.models.regressao_linear   # results/metrics/regressao_linear_*.csv
-python -m src.models.arvore_decisao     # results/metrics/arvore_decisao_*.csv e a figura de overfitting
-python -m src.models.knn                # results/metrics/knn_busca.csv e knn_kills.csv
-pytest                                  # testes automatizados
+python -m src.data.dataset_final                     # gera data/processed/tb_lobby_stats_player_final.csv
+python -m src.models.baseline                        # results/metrics/baseline_kills.csv
+python -m src.models.regressao_linear                # results/metrics/regressao_linear_*.csv
+python -m src.models.arvore_decisao                  # results/metrics/arvore_decisao_*.csv e a figura de overfitting
+python -m src.models.knn                             # results/metrics/knn_busca.csv e knn_kills.csv
+python -m src.models.hist_gradient_boosting          # results/metrics/hist_gradient_boosting_busca.csv e _kills.csv
+python -m src.models.hist_gradient_boosting --teste  # results/metrics/hist_gradient_boosting_teste.csv
+pytest                                               # testes automatizados
 ```
 
-O fluxo dos dados é sempre o mesmo: CSV original → limpeza (`data_cleaning`) → features do histórico (`feature_historico`) → dataset final (`dataset_final`) → divisão por data (`separacao_dados`) → modelos → métricas (`evaluation`). A avaliação do KNN no conjunto de teste (`results/metrics/knn_teste.csv`) é feita em `notebooks/05_knn.ipynb`.
+O fluxo dos dados é sempre o mesmo: CSV original → limpeza (`data_cleaning`) → features do histórico (`feature_historico`) → dataset final (`dataset_final`) → divisão por data (`separacao_dados`) → modelos → métricas (`evaluation`). A avaliação do KNN no conjunto de teste (`results/metrics/knn_teste.csv`) é feita em `notebooks/05_knn.ipynb`; a do HistGradientBoosting (`results/metrics/hist_gradient_boosting_teste.csv`) é feita pelo comando com `--teste`, que usa a configuração já escolhida na validação.
 
 ## Estrutura do repositório
 
@@ -75,7 +78,8 @@ O fluxo dos dados é sempre o mesmo: CSV original → limpeza (`data_cleaning`) 
 ├── docs/
 │   ├── modelos_regressao.md      # seleção dos modelos
 │   ├── regressao_linear.md
-│   └── arvore_decisao.md
+│   ├── arvore_decisao.md
+│   └── hist_gradient_boosting.md
 ├── notebooks/
 │   ├── 00_compreensao_dataset.ipynb
 │   ├── 01_eda_dataset.ipynb
@@ -96,7 +100,8 @@ O fluxo dos dados é sempre o mesmo: CSV original → limpeza (`data_cleaning`) 
 │   │   ├── baseline.py
 │   │   ├── regressao_linear.py
 │   │   ├── arvore_decisao.py
-│   │   └── knn.py
+│   │   ├── knn.py
+│   │   └── hist_gradient_boosting.py
 │   ├── evaluation/
 │   │   ├── metricas.py           # MAE, RMSE e R², iguais para todos os modelos
 │   │   └── resultados.py         # gravação e exibição das tabelas de resultados
