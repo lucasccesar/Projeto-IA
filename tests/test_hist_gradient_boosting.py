@@ -4,10 +4,11 @@ import pytest
 
 from src.data.dataset_final import FEATURE_COLUMNS, TARGET_COLUMN
 from src.models.hist_gradient_boosting import (
+    BASELINE,
     LOSSES,
+    MODELO,
     avaliar_no_teste,
     buscar_hiperparametros,
-    calcular_metricas,
     combinacoes,
     configuracao_selecionada,
     criar_modelo,
@@ -32,12 +33,6 @@ GRADE = {
 }
 
 
-def test_metricas_em_kills():
-    m = calcular_metricas(pd.Series([10, 20]), np.array([12, 16]))
-    assert m["MAE"] == 3
-    assert np.isclose(m["RMSE"], np.sqrt((4 + 16) / 2))
-
-
 def test_grade_padrao_tem_as_duas_losses():
     configuracoes = combinacoes()
     assert {c["loss"] for c in configuracoes} == {"squared_error", "absolute_error"}
@@ -56,52 +51,58 @@ def test_busca_avalia_todas_as_configuracoes_das_duas_losses():
     assert len(busca) == 2 * len(LOSSES)
     assert set(busca["loss"]) == set(LOSSES)
     assert busca["MAE_validacao"].is_monotonic_increasing
-    assert (busca["partidas_treino"] == 300).all()
-    assert (busca["partidas_validacao"] == 100).all()
     assert {"MAE_treino", "RMSE_validacao", "R2_validacao", "diferenca_MAE"} <= set(busca.columns)
 
 
-def test_selecao_pelo_menor_mae_de_validacao():
+def test_resumo_tem_a_melhor_configuracao_de_cada_loss_no_formato_padrao():
     treino, validacao = _conjunto(500, 0), _conjunto(200, 1)
     busca = buscar_hiperparametros(treino, validacao, GRADE)
-    escolhida = melhor_configuracao(busca)
-    assert escolhida["loss"] == busca.loc[busca["MAE_validacao"].idxmin(), "loss"]
+    resumo = resumo_validacao(busca, len(validacao))
 
-    resumo = resumo_validacao(busca)
+    assert list(resumo.columns[:2]) == ["conjunto", "modelo"]
+    assert list(resumo.columns[-4:]) == ["partidas", "MAE", "RMSE", "R2"]
     assert len(resumo) == len(LOSSES)
-    assert resumo["selecionado"].sum() == 1
-    selecionada = resumo[resumo["selecionado"]].iloc[0]
-    assert np.isclose(selecionada["MAE"], busca["MAE_validacao"].min())
-    assert selecionada["max_iter"] == escolhida["max_iter"]
+    assert set(resumo["loss"]) == set(LOSSES)
+    assert (resumo["conjunto"] == "validacao").all()
+    assert (resumo["modelo"] == MODELO).all()
     assert (resumo["partidas"] == 200).all()
+    assert resumo["MAE"].is_monotonic_increasing
 
+    escolhida = resumo.iloc[0]
+    assert np.isclose(escolhida["MAE"], busca["MAE_validacao"].min())
     mae_media = (validacao[TARGET_COLUMN] - treino[TARGET_COLUMN].mean()).abs().mean()
-    assert selecionada["MAE"] < mae_media
+    assert escolhida["MAE"] < mae_media
 
 
-def test_avaliacao_no_teste_usa_a_configuracao_selecionada_e_a_baseline():
-    treino, validacao, teste = _conjunto(500, 0), _conjunto(200, 1), _conjunto(150, 2)
-    resumo = resumo_validacao(buscar_hiperparametros(treino, validacao, GRADE))
-    configuracao, mae_validacao = configuracao_selecionada(resumo)
-    assert configuracao == melhor_configuracao(buscar_hiperparametros(treino, validacao, GRADE))
-
-    resultado = avaliar_no_teste(treino, validacao, teste, configuracao, mae_validacao)
-    assert list(resultado["modelo"]) == ["baseline (média histórica)", f"hist_gradient_boosting_{configuracao['loss']}"]
-    assert (resultado["conjunto"] == "teste").all()
-    assert (resultado["partidas_teste"] == 150).all()
-    assert (resultado["partidas_treino"] == 500).all()
-    baseline, modelo = resultado.iloc[0], resultado.iloc[1]
-    assert np.isclose(baseline["MAE_teste"], (teste[TARGET_COLUMN] - teste["mediaKills_hist"]).abs().mean())
-    assert baseline["diferenca_para_baseline"] == 0
-    assert np.isclose(modelo["MAE_validacao"], mae_validacao)
-    assert modelo["max_iter"] == configuracao["max_iter"]
+def test_configuracao_selecionada_e_a_de_menor_mae_na_validacao():
+    busca = buscar_hiperparametros(_conjunto(500, 0), _conjunto(200, 1), GRADE)
+    resumo = resumo_validacao(busca, 200)
+    # A ordem das linhas não importa: vale a menor MAE.
+    assert configuracao_selecionada(resumo[::-1]) == melhor_configuracao(busca)
 
 
-def test_configuracao_selecionada_exige_uma_unica_linha():
-    resumo = resumo_validacao(buscar_hiperparametros(_conjunto(300, 0), _conjunto(100, 1), GRADE))
-    resumo["selecionado"] = True
+def test_configuracao_selecionada_exige_resumo_preenchido():
     with pytest.raises(ValueError):
-        configuracao_selecionada(resumo)
+        configuracao_selecionada(pd.DataFrame(columns=["loss", "MAE"]))
+
+
+def test_avaliacao_no_teste_usa_a_configuracao_escolhida_e_a_baseline():
+    treino, validacao, teste = _conjunto(500, 0), _conjunto(200, 1), _conjunto(150, 2)
+    configuracao = melhor_configuracao(buscar_hiperparametros(treino, validacao, GRADE))
+
+    resultado = avaliar_no_teste(treino, teste, configuracao)
+    assert list(resultado.columns[:2]) == ["conjunto", "modelo"]
+    assert list(resultado.columns[-4:]) == ["partidas", "MAE", "RMSE", "R2"]
+    assert list(resultado["modelo"]) == [BASELINE, MODELO]
+    assert (resultado["conjunto"] == "teste").all()
+    assert (resultado["partidas"] == 150).all()
+
+    baseline, modelo = resultado.iloc[0], resultado.iloc[1]
+    mae_baseline = (teste[TARGET_COLUMN] - teste["mediaKills_hist"]).abs().mean()
+    assert np.isclose(baseline["MAE"], mae_baseline)
+    assert pd.isna(baseline["loss"])
+    assert modelo["loss"] == configuracao["loss"]
+    assert modelo["max_iter"] == configuracao["max_iter"]
 
 
 def test_melhor_configuracao_por_loss():
