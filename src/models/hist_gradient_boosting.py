@@ -163,13 +163,14 @@ def configuracao_selecionada(resumo: pd.DataFrame) -> dict:
 
 
 def avaliar_no_teste(
-    treino: pd.DataFrame, teste: pd.DataFrame, configuracao: dict
+    treino: pd.DataFrame, teste: pd.DataFrame, configuracao: dict, nome_modelo: str = MODELO
 ) -> pd.DataFrame:
     """Avaliação final da configuração já escolhida na validação.
 
     O modelo é treinado só no treino, como na busca, e a configuração vem do
     resumo de validação: o teste não participa de nenhuma escolha. A baseline
     (média histórica de kills do jogador) é avaliada nas mesmas partidas.
+    `nome_modelo` identifica a busca que escolheu a configuração (grid search ou PSO).
     """
     X_treino, y_treino = separar_entradas_alvo(treino)
     X_teste, y_teste = separar_entradas_alvo(teste)
@@ -185,7 +186,7 @@ def avaliar_no_teste(
         },
         {
             "conjunto": "teste",
-            "modelo": MODELO,
+            "modelo": nome_modelo,
             **configuracao,
             "partidas": len(teste),
             **calcular_metricas(y_teste, modelo.predict(X_teste)),
