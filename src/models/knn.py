@@ -22,7 +22,7 @@ ARQUIVO_BUSCA = "knn_busca.csv"
 ARQUIVO_RESUMO = "knn_kills.csv"
 
 # Hiperparâmetros testados: quantidade de vizinhos e forma de medir a distância.
-VALORES_K = [3, 5, 7, 9, 11, 15, 20, 30, 40, 50, 100, 200, 300]
+VALORES_K = [3, 5, 7, 9, 11, 15]
 DISTANCIAS = ["euclidean", "manhattan", "chebyshev"]
 
 
