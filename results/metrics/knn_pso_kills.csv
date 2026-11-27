@@ -1,0 +1,2 @@
+conjunto,modelo,k,distancia,partidas,MAE,RMSE,R2
+validacao,knn_pso,15,manhattan,25916,5.548405,7.144417,0.104743
